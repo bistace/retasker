@@ -1,0 +1,12 @@
+version 0.1.0
+
+depends-on framebuffer-spy:0.2.0
+depends-on xovi-message-broker:0.2.0
+
+import? framebuffer-spy$getConfigString
+
+export captureHandler
+with
+    xovi-message-broker$simpleSignal = "retasker.capture"
+    xovi-message-broker$version = 1
+end
