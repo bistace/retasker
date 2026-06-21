@@ -1,0 +1,56 @@
+; reTasker: add an "Add to todos" button to the handwriting selection menu.
+;
+; Targets SceneSelectionHandler.qml, the lasso/circle selection overlay that
+; shows cut/copy/convert/delete. We append one more ContextualMenu.Button that
+; reads the on-screen selection rectangle (mapped to framebuffer pixels) and
+; ships it as JSON to the native retasker-capture extension over the message
+; broker, which crops the framebuffer and writes the PNG.
+;
+; Unhashed on purpose: Xochitl ships its QML as plaintext, so real identifiers
+; match directly and we avoid a hashtab dependency.
+
+AFFECT /qml/common/SceneSelectionHandler.qml
+    IMPORT net.asivery.XoviMessageBroker 2.0
+
+    TRAVERSE Item#selectionRoot
+        LOCATE BEFORE ALL
+        INSERT {
+            XoviMessageBroker {
+                id: retaskerBroker
+            }
+        }
+    END TRAVERSE
+
+    TRAVERSE Item#selectionRoot > SelectionContextualMenu#tools
+        LOCATE AFTER ALL
+        INSERT {
+            ArkControls.ContextualMenu.Button {
+                id: retaskerAddTodo
+                focusPolicy: Qt.NoFocus
+                type: tools.type
+                visible: controller && controller.selectionContainsStroke
+                iconSource: "qrc:/ark/icons/checkmark_circle"
+                onClicked: {
+                    const dpr = Screen.devicePixelRatio;
+                    const c0 = selection.mapToItem(null, 0, 0);
+                    const c1 = selection.mapToItem(null, selection.width, 0);
+                    const c2 = selection.mapToItem(null, selection.width, selection.height);
+                    const c3 = selection.mapToItem(null, 0, selection.height);
+                    const minX = Math.min(c0.x, c1.x, c2.x, c3.x);
+                    const minY = Math.min(c0.y, c1.y, c2.y, c3.y);
+                    const maxX = Math.max(c0.x, c1.x, c2.x, c3.x);
+                    const maxY = Math.max(c0.y, c1.y, c2.y, c3.y);
+                    const bbox = {
+                        x: Math.round(minX * dpr),
+                        y: Math.round(minY * dpr),
+                        width: Math.round((maxX - minX) * dpr),
+                        height: Math.round((maxY - minY) * dpr)
+                    };
+                    const result = retaskerBroker.sendSimpleSignal("retasker.capture", JSON.stringify(bbox));
+                    print("[retasker] capture", JSON.stringify(bbox), "->", result);
+                    selectionRoot.close();
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT
