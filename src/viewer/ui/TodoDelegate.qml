@@ -12,6 +12,15 @@ Item {
     property string dateText
 
     signal toggleClicked
+    signal longPressed
+
+    // Long-press anywhere on the row opens the delete confirmation.
+    // Declared first so it sits below the toggle (toggle taps still win);
+    // it only handles press-and-hold, so list flicking is unaffected.
+    MouseArea {
+        anchors.fill: parent
+        onPressAndHold: row.longPressed()
+    }
 
     // Toggle circle (large tap target on the left).
     Rectangle {

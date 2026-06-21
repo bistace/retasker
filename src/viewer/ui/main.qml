@@ -1,6 +1,7 @@
 import QtQuick
 import Qt.labs.folderlistmodel
 import Qt.labs.settings
+import net.asivery.XoviMessageBroker 2.0
 import "store.js" as Store
 
 // reTasker viewer — a frontend-only AppLoad app.
@@ -25,12 +26,16 @@ Rectangle {
     readonly property string capturesDir: "file:///home/root/xovi/exthome/appload/retasker/captures"
     property string filter: "todo"          // "todo" | "done" | "all"
     property var doneMap: ({})
+    property string pendingDelete: ""
 
     Settings {
         id: settings
         category: "retasker"
         property string doneJson: "{}"
     }
+
+    // Native side (retasker-capture.so) handles the actual file removal.
+    XoviMessageBroker { id: broker }
 
     FolderListModel {
         id: folder
@@ -66,6 +71,28 @@ Rectangle {
         root.doneMap[name] = !root.doneMap[name];
         settings.doneJson = JSON.stringify(root.doneMap);
         refresh();
+    }
+
+    function askDelete(name) {
+        root.pendingDelete = name;
+    }
+
+    function confirmDelete() {
+        var name = root.pendingDelete;
+        root.pendingDelete = "";
+        if (!name)
+            return;
+        broker.sendSimpleSignal("retasker.delete", name);
+        if (root.doneMap[name] !== undefined) {
+            delete root.doneMap[name];
+            settings.doneJson = JSON.stringify(root.doneMap);
+        }
+        for (var i = 0; i < rows.count; i++) {
+            if (rows.get(i).name === name) {
+                rows.remove(i);
+                break;
+            }
+        }
     }
 
     // --- Header: title, filter segments, close ---------------------------
@@ -149,6 +176,7 @@ Rectangle {
             done: model.done
             dateText: model.dateText
             onToggleClicked: root.toggle(model.name)
+            onLongPressed: root.askDelete(model.name)
         }
     }
 
@@ -158,6 +186,68 @@ Rectangle {
         text: root.filter === "done" ? "Nothing done yet" : "No todos"
         font.pixelSize: 40
         color: "black"
+    }
+
+    // --- Delete confirmation ---------------------------------------------
+    // Opaque modal: long-pressing a row sets pendingDelete, which shows this.
+    Rectangle {
+        id: confirm
+        anchors.fill: parent
+        visible: root.pendingDelete !== ""
+        color: "white"
+
+        // Swallow taps so nothing behind the modal reacts.
+        MouseArea { anchors.fill: parent }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 720
+            height: 380
+            color: "white"
+            border.color: "black"
+            border.width: 4
+
+            Text {
+                id: confirmTitle
+                anchors { top: parent.top; topMargin: 56; horizontalCenter: parent.horizontalCenter }
+                text: "Delete this todo?"
+                font.pixelSize: 46
+                font.bold: true
+                color: "black"
+            }
+
+            Text {
+                anchors { top: confirmTitle.bottom; topMargin: 20; horizontalCenter: parent.horizontalCenter }
+                text: "This cannot be undone."
+                font.pixelSize: 30
+                color: "black"
+            }
+
+            Row {
+                anchors { bottom: parent.bottom; bottomMargin: 48; horizontalCenter: parent.horizontalCenter }
+                spacing: 40
+
+                Rectangle {
+                    width: 260
+                    height: 100
+                    color: "white"
+                    border.color: "black"
+                    border.width: 3
+                    Text { anchors.centerIn: parent; text: "Cancel"; font.pixelSize: 40; color: "black" }
+                    MouseArea { anchors.fill: parent; onClicked: root.pendingDelete = "" }
+                }
+
+                Rectangle {
+                    width: 260
+                    height: 100
+                    color: "black"
+                    border.color: "black"
+                    border.width: 3
+                    Text { anchors.centerIn: parent; text: "Delete"; font.pixelSize: 40; color: "white" }
+                    MouseArea { anchors.fill: parent; onClicked: root.confirmDelete() }
+                }
+            }
+        }
     }
 
     Component.onCompleted: refresh()
