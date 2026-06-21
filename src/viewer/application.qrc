@@ -1,0 +1,7 @@
+<RCC>
+    <qresource>
+        <file>ui/main.qml</file>
+        <file>ui/TodoDelegate.qml</file>
+        <file>ui/store.js</file>
+    </qresource>
+</RCC>
