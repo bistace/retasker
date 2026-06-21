@@ -20,7 +20,9 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../vendor/stb_image_write.h"
 
-#define CAPTURE_DIR "/home/root/retasker-captures"
+// The viewer (AppLoad app) treats this folder as the todo list, so capture
+// writes here and delete removes from here — one shared source of truth.
+#define CAPTURE_DIR "/home/root/xovi/exthome/appload/retasker/captures"
 #define FB_TYPE_RGBA 2  // FBSPY_TYPE_RGBA from framebuffer-spy.h (32-bit pixels)
 
 struct fb_config {
@@ -129,4 +131,25 @@ char *captureHandler(const char *value) {
     char *path = write_png(rgb, &r);
     free(rgb);
     return path;
+}
+
+// export: invoked by xovi-message-broker for the "retasker.delete" signal.
+// Payload is a bare PNG filename; the file is removed from the viewer's
+// captures dir. A '/' in the name is rejected so the payload can't escape it.
+char *deleteHandler(const char *value) {
+    fprintf(stderr, "[retasker] delete signal: %s\n", value ? value : "(null)");
+
+    if (value == NULL || value[0] == '\0' || strchr(value, '/') != NULL) {
+        fprintf(stderr, "[retasker] bad delete payload\n");
+        return NULL;
+    }
+
+    char path[256];
+    snprintf(path, sizeof(path), "%s/%s", CAPTURE_DIR, value);
+    if (remove(path) != 0) {
+        fprintf(stderr, "[retasker] delete failed: %s\n", path);
+        return NULL;
+    }
+    fprintf(stderr, "[retasker] deleted %s\n", path);
+    return NULL;
 }

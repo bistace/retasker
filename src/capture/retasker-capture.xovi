@@ -10,3 +10,9 @@ with
     xovi-message-broker$simpleSignal = "retasker.capture"
     xovi-message-broker$version = 1
 end
+
+export deleteHandler
+with
+    xovi-message-broker$simpleSignal = "retasker.delete"
+    xovi-message-broker$version = 1
+end
