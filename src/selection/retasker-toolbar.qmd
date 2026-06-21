@@ -1,0 +1,28 @@
+; reTasker: add an "open viewer" button to the notebook toolbar.
+;
+; Targets Toolbar.qml, the writing-view toolbar (pen/eraser/
+; selection + undo/redo). We append one ArkControls.ToolButton at the end of
+; the tool GridLayout; tapping it asks AppLoad to launch the reTasker viewer
+; fullscreen. Because the viewer is a fullscreen overlay, closing it drops the
+; user straight back into the notebook they launched it from.
+;
+; Unhashed on purpose: Xochitl ships its QML as plaintext, so real identifiers
+; match directly and we avoid a hashtab dependency.
+
+AFFECT /qt/qml/xofm/libs/toolbar/qml/Toolbar.qml
+    IMPORT net.asivery.AppLoad 1.0
+
+    TRAVERSE FocusScope#root > Item#toolbar > GridLayout#toolLayout
+        LOCATE BEFORE Repeater[.objectName="secondaryTools"]
+        INSERT {
+            ArkControls.ToolButton {
+                id: retaskerOpenViewer
+                objectName: "retasker-open-viewer-button"
+                focusPolicy: Qt.NoFocus
+                visible: root.expanded
+                iconSource: "qrc:/ark/icons/checkmark_circle"
+                onClicked: AppLoadLauncher.launchApplication("retasker", [], ({}), false)
+            }
+        }
+    END TRAVERSE
+END AFFECT
