@@ -428,6 +428,32 @@ Rectangle {
             onClicked: { root.selectedDay = ""; root.refresh(); }
         }
 
+        // Create a real notebook for the selected day (or today), filed in the
+        // "reTasker" collection, and open it. The viewer can't reach xochitl's
+        // controllers, so it asks the native bridge, which hands off to the
+        // MainView handler; closing the viewer drops the user into the new note.
+        Rectangle {
+            id: newNoteBtn
+            anchors { right: parent.right; rightMargin: 32; verticalCenter: parent.verticalCenter }
+            width: 300
+            height: 60
+            color: "black"
+            Text {
+                anchors.centerIn: parent
+                text: "+ New note"
+                font.pixelSize: 32
+                color: "white"
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    var key = root.selectedDay !== "" ? root.selectedDay : root.todayKey;
+                    broker.sendSimpleSignal("retasker.newnote", JSON.stringify({ name: root.dayLabel(key) }));
+                    root.close();
+                }
+            }
+        }
+
         Rectangle {
             anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
             height: 2
