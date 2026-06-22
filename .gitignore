@@ -1,1 +1,3 @@
 /build/
+# Holds the OpenRouter API key; deployed to the device, never committed.
+src/viewer/config.json

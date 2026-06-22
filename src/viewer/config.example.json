@@ -1,0 +1,6 @@
+{
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "apiKey": "sk-or-REPLACE_WITH_YOUR_OPENROUTER_KEY",
+    "model": "google/gemini-3.5-flash",
+    "prompt": "You are an OCR system. The image is a short handwritten note in French. Transcribe it exactly as written, keeping line breaks. Output ONLY the transcription, with no quotes, labels, or commentary. If you cannot read it confidently, output exactly: UNREADABLE"
+}
