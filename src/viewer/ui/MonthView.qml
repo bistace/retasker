@@ -138,7 +138,7 @@ Item {
 
                 MouseArea {
                     anchors.fill: parent
-                    enabled: cell.total > 0
+                    enabled: cell.modelData !== null
                     onClicked: monthView.dayClicked(cell.modelData.key)
                 }
             }
