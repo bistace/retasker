@@ -2,9 +2,19 @@ import QtQuick
 
 // One todo row: a toggle circle, the captured snippet, and its date.
 // Pure black/white, no animation — meant for e-ink.
+//
+// Height adapts to the content: image snippets get a fixed tall box, while
+// transcribed text shrinks to fit its line(s) so a one-line todo isn't a
+// wall of whitespace.
 Item {
     id: row
-    height: 320
+    height: row.kind === "text"
+            ? Math.max(transcription.implicitHeight + 2 * vpad, minHeight)
+            : imageHeight
+
+    readonly property int vpad: 28
+    readonly property int minHeight: 124
+    readonly property int imageHeight: 320
 
     property string name
     property string kind            // "image" (PNG snippet) | "text" (OCR result)
@@ -28,8 +38,8 @@ Item {
     Rectangle {
         id: check
         anchors { left: parent.left; leftMargin: 36; verticalCenter: parent.verticalCenter }
-        width: 88
-        height: 88
+        width: 56
+        height: 56
         radius: width / 2
         color: row.done ? "black" : "white"
         border.color: "black"
@@ -38,14 +48,14 @@ Item {
         Canvas {
             id: checkmark
             anchors.centerIn: parent
-            width: 50
-            height: 50
+            width: 34
+            height: 34
             visible: row.done
             onPaint: {
                 var ctx = getContext("2d");
                 ctx.reset();
                 ctx.strokeStyle = "white";
-                ctx.lineWidth = 7;
+                ctx.lineWidth = 5;
                 ctx.lineCap = "round";
                 ctx.lineJoin = "round";
                 ctx.beginPath();
