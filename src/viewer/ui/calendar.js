@@ -1,0 +1,57 @@
+.pragma library
+
+// Calendar helpers for the month view. Pure functions: no Qt, no file IO.
+// Days are keyed "year-month-day" (1-based month/day, no zero padding) — the
+// key is only ever used as a map lookup, so its exact form doesn't matter as
+// long as dateKey() and monthGrid() agree.
+
+function dateKey(d) {
+    return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+}
+
+// Count todos and how many are done, per day. Mirrors the list's done-state
+// (keyed by base in doneMap) so a day's marker matches what you'd see inside it.
+function buildIndex(entries, doneMap) {
+    var idx = {};
+    for (var i = 0; i < entries.length; i++) {
+        var e = entries[i];
+        var k = dateKey(e.mtime);
+        if (!idx[k])
+            idx[k] = { total: 0, done: 0 };
+        idx[k].total += 1;
+        if (doneMap[e.base] === true)
+            idx[k].done += 1;
+    }
+    return idx;
+}
+
+// Sum a month's todos from the day index (built by buildIndex). Keys are
+// "year-month-day", so a "year-month-" prefix picks out exactly that month.
+function monthCounts(index, year, month) {
+    var prefix = year + "-" + (month + 1) + "-";
+    var total = 0, done = 0;
+    for (var k in index) {
+        if (k.indexOf(prefix) === 0) {
+            total += index[k].total;
+            done += index[k].done;
+        }
+    }
+    return { total: total, done: done };
+}
+
+// Cells for the given month, Monday-first, padded to whole weeks. Leading and
+// trailing pad cells are null so the grid can render them blank.
+function monthGrid(year, month) {
+    var first = new Date(year, month, 1);
+    var lead = (first.getDay() + 6) % 7;            // JS Sun=0..Sat=6 -> Mon=0
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var cells = [];
+    var i;
+    for (i = 0; i < lead; i++)
+        cells.push(null);
+    for (i = 1; i <= daysInMonth; i++)
+        cells.push({ day: i, key: year + "-" + (month + 1) + "-" + i });
+    while (cells.length % 7 !== 0)
+        cells.push(null);
+    return cells;
+}

@@ -4,6 +4,7 @@ import Qt.labs.settings
 import net.asivery.XoviMessageBroker 2.0
 import "store.js" as Store
 import "ocr.js" as Ocr
+import "calendar.js" as Cal
 
 // reTasker viewer — a frontend-only AppLoad app.
 //
@@ -28,6 +29,21 @@ Rectangle {
     readonly property string capturesDir: appDir + "/captures"
     property string filter: "todo"          // "todo" | "done" | "all"
     property var doneMap: ({})
+
+    // Calendar: viewMode switches the body between the flat list and the month
+    // grid. selectedDay (a "y-m-d" key) is set when a day is tapped in the grid,
+    // which filters the list to that day. dayIndex maps each day to its
+    // {total, done} counts so the grid can mark it. shown* drive which month is
+    // displayed; todayKey highlights today's cell.
+    property string viewMode: "list"        // "list" | "calendar"
+    property string selectedDay: ""
+    property var dayIndex: ({})
+    property int shownYear: 0
+    property int shownMonth: 0               // 0-based
+    property string todayKey: ""
+    readonly property string monthLabel: Qt.formatDate(new Date(root.shownYear, root.shownMonth, 1), "MMMM yyyy")
+    readonly property var monthCounts: Cal.monthCounts(root.dayIndex, root.shownYear, root.shownMonth)
+    readonly property bool monthAllDone: monthCounts.total > 0 && monthCounts.done === monthCounts.total
 
     // Delete confirmation: pendingDelete holds the filename; the rest mirror the
     // row's content so the modal can preview exactly which todo is going away.
@@ -69,7 +85,19 @@ Rectangle {
             root.doneMap = {};
         }
         var entries = Store.collect(folder);
-        var visible = Store.view(entries, root.doneMap, root.filter);
+        root.dayIndex = Cal.buildIndex(entries, root.doneMap);
+        // Calendar view shows every todo (done included); the status filter is a
+        // list-view concern. Then scope to the selected day, or the shown month.
+        var effFilter = root.viewMode === "calendar" ? "all" : root.filter;
+        var visible = Store.view(entries, root.doneMap, effFilter);
+        if (root.viewMode === "calendar") {
+            if (root.selectedDay !== "")
+                visible = visible.filter(function (v) { return Cal.dateKey(v.mtime) === root.selectedDay; });
+            else
+                visible = visible.filter(function (v) {
+                    return v.mtime.getFullYear() === root.shownYear && v.mtime.getMonth() === root.shownMonth;
+                });
+        }
         rows.clear();
         for (var i = 0; i < visible.length; i++) {
             var v = visible[i];
@@ -203,6 +231,25 @@ Rectangle {
         }
     }
 
+    // Move the calendar forward/back by whole months, rolling the year over.
+    function shiftMonth(delta) {
+        var m = root.shownMonth + delta;
+        var y = root.shownYear;
+        while (m < 0) { m += 12; y -= 1; }
+        while (m > 11) { m -= 12; y += 1; }
+        root.shownMonth = m;
+        root.shownYear = y;
+        root.selectedDay = "";
+        root.refresh();
+    }
+
+    function dayLabel(key) {
+        if (!key)
+            return "";
+        var p = key.split("-");
+        return Qt.formatDate(new Date(p[0], p[1] - 1, p[2]), "d MMMM yyyy");
+    }
+
     // --- Header: title, filter segments, close ---------------------------
     Rectangle {
         id: header
@@ -231,30 +278,64 @@ Rectangle {
 
         Row {
             anchors { left: parent.left; leftMargin: 32; top: title.bottom; topMargin: 28 }
-            spacing: 0
+            spacing: 24
 
-            Repeater {
-                model: [
-                    { key: "todo", text: "To do" },
-                    { key: "done", text: "Done" },
-                    { key: "all", text: "All" }
-                ]
-                delegate: Rectangle {
-                    required property var modelData
-                    width: 200
-                    height: 88
-                    color: root.filter === modelData.key ? "black" : "white"
-                    border.color: "black"
-                    border.width: 2
-                    Text {
-                        anchors.centerIn: parent
-                        text: modelData.text
-                        font.pixelSize: 36
-                        color: root.filter === modelData.key ? "white" : "black"
+            // Primary view switch: flat list vs month calendar.
+            Row {
+                spacing: 0
+                Repeater {
+                    model: [
+                        { key: "list", text: "List" },
+                        { key: "calendar", text: "Calendar" }
+                    ]
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: 200
+                        height: 88
+                        color: root.viewMode === modelData.key ? "black" : "white"
+                        border.color: "black"
+                        border.width: 2
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.text
+                            font.pixelSize: 36
+                            color: root.viewMode === modelData.key ? "white" : "black"
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: { root.viewMode = modelData.key; root.selectedDay = ""; root.refresh(); }
+                        }
                     }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: { root.filter = modelData.key; root.refresh(); }
+                }
+            }
+
+            // Status filter — only meaningful for the flat list.
+            Row {
+                spacing: 0
+                visible: root.viewMode === "list"
+                Repeater {
+                    model: [
+                        { key: "todo", text: "To do" },
+                        { key: "done", text: "Done" },
+                        { key: "all", text: "All" }
+                    ]
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: 200
+                        height: 88
+                        color: root.filter === modelData.key ? "black" : "white"
+                        border.color: "black"
+                        border.width: 2
+                        Text {
+                            anchors.centerIn: parent
+                            text: modelData.text
+                            font.pixelSize: 36
+                            color: root.filter === modelData.key ? "white" : "black"
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: { root.filter = modelData.key; root.refresh(); }
+                        }
                     }
                 }
             }
@@ -267,10 +348,96 @@ Rectangle {
         }
     }
 
-    // --- List -------------------------------------------------------------
+    // --- Month calendar (upper pane in calendar view) ---------------------
+    MonthView {
+        id: monthPane
+        anchors { top: header.bottom; left: parent.left; right: parent.right }
+        height: (root.height - header.height) * 0.58
+        visible: root.viewMode === "calendar"
+        year: root.shownYear
+        month: root.shownMonth
+        dayIndex: root.dayIndex
+        todayKey: root.todayKey
+        selectedKey: root.selectedDay
+        onDayClicked: function (key) {
+            root.selectedDay = (key === root.selectedDay) ? "" : key;
+            root.refresh();
+        }
+        onPrevMonth: root.shiftMonth(-1)
+        onNextMonth: root.shiftMonth(1)
+    }
+
+    // Context strip above the todo list while in calendar view: the shown month,
+    // or the selected day with a tap-to-clear back to the whole month.
+    Rectangle {
+        id: listBar
+        anchors { top: monthPane.bottom; left: parent.left; right: parent.right }
+        height: 72
+        visible: root.viewMode === "calendar"
+        color: "white"
+
+        Row {
+            anchors { left: parent.left; leftMargin: 32; verticalCenter: parent.verticalCenter }
+            spacing: 20
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.selectedDay !== "" ? ("‹ " + root.dayLabel(root.selectedDay)) : root.monthLabel
+                font.pixelSize: 34
+                font.bold: true
+                color: "black"
+            }
+
+            // Whole-month-done badge (only on the month label, not a day view).
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 48; height: 48; radius: 24
+                visible: root.selectedDay === "" && root.monthAllDone
+                color: "black"
+
+                Canvas {
+                    anchors.centerIn: parent
+                    width: 30; height: 30
+                    onPaint: {
+                        var ctx = getContext("2d");
+                        ctx.reset();
+                        ctx.strokeStyle = "white";
+                        ctx.lineWidth = 5;
+                        ctx.lineCap = "round";
+                        ctx.lineJoin = "round";
+                        ctx.beginPath();
+                        ctx.moveTo(width * 0.18, height * 0.52);
+                        ctx.lineTo(width * 0.42, height * 0.76);
+                        ctx.lineTo(width * 0.84, height * 0.24);
+                        ctx.stroke();
+                    }
+                    onVisibleChanged: if (visible) requestPaint()
+                    Component.onCompleted: requestPaint()
+                }
+            }
+        }
+        MouseArea {
+            anchors.fill: parent
+            enabled: root.selectedDay !== ""
+            onClicked: { root.selectedDay = ""; root.refresh(); }
+        }
+
+        Rectangle {
+            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            height: 2
+            color: "black"
+        }
+    }
+
+    // --- Todo list --------------------------------------------------------
+    // The flat list in list view; the month's (or selected day's) todos below
+    // the grid in calendar view.
     ListView {
         id: list
-        anchors { top: header.bottom; left: parent.left; right: parent.right; bottom: parent.bottom }
+        anchors {
+            top: root.viewMode === "calendar" ? listBar.bottom : header.bottom
+            left: parent.left; right: parent.right; bottom: parent.bottom
+        }
         model: rows
         clip: true
         cacheBuffer: 0
@@ -293,7 +460,7 @@ Rectangle {
     Text {
         anchors.centerIn: list
         visible: rows.count === 0
-        text: root.filter === "done" ? "Nothing done yet" : "No todos"
+        text: root.filter === "done" && root.viewMode === "list" ? "Nothing done yet" : "No todos"
         font.pixelSize: 40
         color: "black"
     }
@@ -397,6 +564,10 @@ Rectangle {
     }
 
     Component.onCompleted: {
+        var now = new Date();
+        root.shownYear = now.getFullYear();
+        root.shownMonth = now.getMonth();
+        root.todayKey = Cal.dateKey(now);
         loadOcrConfig();
         refresh();
     }
