@@ -133,6 +133,87 @@ char *captureHandler(const char *value) {
     return path;
 }
 
+static int has_png_suffix(const char *name) {
+    size_t n = strlen(name);
+    return n > 4 && strcmp(name + n - 4, ".png") == 0;
+}
+
+static int write_text(const char *path, const char *text, size_t len) {
+    FILE *f = fopen(path, "w");
+    if (f == NULL) {
+        fprintf(stderr, "[retasker] txt open failed: %s\n", path);
+        return -1;
+    }
+    fwrite(text, 1, len, f);
+    fclose(f);
+    return 0;
+}
+
+static int hexval(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return 0;
+}
+
+// Percent-decode src into dst (dst must be >= strlen(src)+1). Turns %XX into a
+// raw byte; everything else copies through. Returns the decoded byte count.
+static size_t percent_decode(const char *src, char *dst) {
+    size_t j = 0;
+    for (size_t i = 0; src[i] != '\0'; i++) {
+        if (src[i] == '%' && isxdigit((unsigned char) src[i + 1])
+                          && isxdigit((unsigned char) src[i + 2])) {
+            dst[j++] = (char) ((hexval(src[i + 1]) << 4) | hexval(src[i + 2]));
+            i += 2;
+        } else {
+            dst[j++] = src[i];
+        }
+    }
+    return j;
+}
+
+// export: invoked by xovi-message-broker for the "retasker.transcribe" signal.
+// Payload is "<pngfilename> <percent-encoded utf-8 text>": writes <base>.txt
+// with the decoded text and removes the original <base>.png, turning an image
+// todo into a text todo. Percent-encoding keeps the payload single-line and
+// ASCII so it survives the broker transport and round-trips accents/newlines.
+char *transcribeHandler(const char *value) {
+    if (value == NULL) return NULL;
+    const char *sp = strchr(value, ' ');
+    if (sp == NULL) {
+        fprintf(stderr, "[retasker] bad transcribe payload\n");
+        return NULL;
+    }
+
+    size_t name_len = (size_t)(sp - value);
+    const char *encoded = sp + 1;
+    if (name_len == 0 || name_len > 200 || *encoded == '\0') return NULL;
+
+    char name[208];
+    memcpy(name, value, name_len);
+    name[name_len] = '\0';
+    if (strchr(name, '/') != NULL || !has_png_suffix(name)) {
+        fprintf(stderr, "[retasker] bad transcribe filename: %s\n", name);
+        return NULL;
+    }
+
+    char *text = malloc(strlen(encoded) + 1);
+    if (text == NULL) return NULL;
+    size_t text_len = percent_decode(encoded, text);
+
+    char png_path[256], txt_path[256];
+    snprintf(png_path, sizeof(png_path), "%s/%s", CAPTURE_DIR, name);
+    name[name_len - 4] = '\0';  // strip ".png" to derive the base
+    snprintf(txt_path, sizeof(txt_path), "%s/%s.txt", CAPTURE_DIR, name);
+
+    int ok = (write_text(txt_path, text, text_len) == 0);
+    free(text);
+    if (!ok) return NULL;
+    remove(png_path);
+    fprintf(stderr, "[retasker] transcribed %s.png -> %s.txt\n", name, name);
+    return NULL;
+}
+
 // export: invoked by xovi-message-broker for the "retasker.delete" signal.
 // Payload is a bare PNG filename; the file is removed from the viewer's
 // captures dir. A '/' in the name is rejected so the payload can't escape it.
