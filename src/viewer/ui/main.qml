@@ -3,6 +3,7 @@ import Qt.labs.folderlistmodel
 import Qt.labs.settings
 import net.asivery.XoviMessageBroker 2.0
 import "store.js" as Store
+import "ocr.js" as Ocr
 
 // reTasker viewer — a frontend-only AppLoad app.
 //
@@ -23,10 +24,17 @@ Rectangle {
     signal close
     function unloading() {}
 
-    readonly property string capturesDir: "file:///home/root/xovi/exthome/appload/retasker/captures"
+    readonly property string appDir: "file:///home/root/xovi/exthome/appload/retasker"
+    readonly property string capturesDir: appDir + "/captures"
     property string filter: "todo"          // "todo" | "done" | "all"
     property var doneMap: ({})
     property string pendingDelete: ""
+
+    // OCR (config loaded from appDir/config.json; null disables transcription).
+    // ocrTried guards against re-submitting the same capture within a session;
+    // reopening the app retries anything still left as an image (e.g. offline).
+    property var ocrConfig: null
+    property var ocrTried: ({})
 
     Settings {
         id: settings
@@ -42,7 +50,7 @@ Rectangle {
         folder: root.capturesDir
         showDirs: false
         showFiles: true
-        nameFilters: ["*.png"]
+        nameFilters: ["*.png", "*.txt"]
         onStatusChanged: if (folder.status === FolderListModel.Ready) root.refresh()
     }
 
@@ -58,17 +66,101 @@ Rectangle {
         var visible = Store.view(entries, root.doneMap, root.filter);
         rows.clear();
         for (var i = 0; i < visible.length; i++) {
+            var v = visible[i];
             rows.append({
-                name: visible[i].name,
-                url: visible[i].url,
-                done: visible[i].done,
-                dateText: Qt.formatDateTime(visible[i].mtime, "d MMM HH:mm")
+                base: v.base,
+                name: v.name,
+                kind: v.kind,
+                url: v.url,
+                text: "",
+                done: v.done,
+                dateText: Qt.formatDateTime(v.mtime, "d MMM HH:mm")
             });
+            if (v.kind === "text")
+                root.loadText(v.base, v.url);
+        }
+        root.runOcr(entries);
+    }
+
+    // Transcribe every not-yet-tried image capture in the background. On
+    // success the native side writes the .txt and drops the .png.
+    function runOcr(entries) {
+        if (!root.ocrConfig)
+            return;
+        for (var i = 0; i < entries.length; i++)
+            maybeTranscribe(entries[i]);
+    }
+
+    function maybeTranscribe(entry) {
+        if (entry.kind !== "image" || root.ocrTried[entry.base])
+            return;
+        root.ocrTried[entry.base] = true;
+        var base = entry.base;
+        var png = entry.name;
+        Ocr.transcribe(entry.url, root.ocrConfig, function (text) {
+            if (!text)
+                return;  // offline or unreadable: keep the image
+            // "<file> <percent-encoded text>": keeps the payload single-line so
+            // it survives the broker, and round-trips newlines/accents as UTF-8.
+            broker.sendSimpleSignal("retasker.transcribe", png + " " + encodeURIComponent(text));
+            root.applyTranscription(base, text);
+        });
+    }
+
+    // Swap a row from image to text in place. The native side has just written
+    // the .txt and removed the .png; updating the row directly avoids waiting on
+    // the folder model to notice (the file count is unchanged, so it may not).
+    function applyTranscription(base, text) {
+        for (var i = 0; i < rows.count; i++) {
+            if (rows.get(i).base === base) {
+                rows.setProperty(i, "kind", "text");
+                rows.setProperty(i, "text", text);
+                rows.setProperty(i, "name", base + ".txt");
+                rows.setProperty(i, "url", root.capturesDir + "/" + base + ".txt");
+                return;
+            }
         }
     }
 
-    function toggle(name) {
-        root.doneMap[name] = !root.doneMap[name];
+    function loadOcrConfig() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", root.appDir + "/config.json");
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== XMLHttpRequest.DONE)
+                return;
+            try {
+                root.ocrConfig = JSON.parse(xhr.responseText);
+            } catch (e) {
+                root.ocrConfig = null;
+            }
+            if (root.ocrConfig)
+                root.runOcr(Store.collect(folder));
+        };
+        xhr.send();
+    }
+
+    // Read a transcription file and drop it into its row (async; tiny file).
+    function loadText(base, url) {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", url);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === XMLHttpRequest.DONE)
+                root.setRowText(base, (xhr.responseText || "").trim());
+        };
+        xhr.send();
+    }
+
+    function setRowText(base, text) {
+        for (var i = 0; i < rows.count; i++) {
+            if (rows.get(i).base === base) {
+                rows.setProperty(i, "text", text);
+                return;
+            }
+        }
+    }
+
+    function toggle(base) {
+        root.doneMap[base] = !root.doneMap[base];
         settings.doneJson = JSON.stringify(root.doneMap);
         refresh();
     }
@@ -83,8 +175,9 @@ Rectangle {
         if (!name)
             return;
         broker.sendSimpleSignal("retasker.delete", name);
-        if (root.doneMap[name] !== undefined) {
-            delete root.doneMap[name];
+        var base = name.replace(/\.(png|txt)$/i, "");
+        if (root.doneMap[base] !== undefined) {
+            delete root.doneMap[base];
             settings.doneJson = JSON.stringify(root.doneMap);
         }
         for (var i = 0; i < rows.count; i++) {
@@ -172,10 +265,12 @@ Rectangle {
         delegate: TodoDelegate {
             width: list.width
             name: model.name
+            kind: model.kind
+            text: model.text
             imageUrl: model.url
             done: model.done
             dateText: model.dateText
-            onToggleClicked: root.toggle(model.name)
+            onToggleClicked: root.toggle(model.base)
             onLongPressed: root.askDelete(model.name)
         }
     }
@@ -250,5 +345,8 @@ Rectangle {
         }
     }
 
-    Component.onCompleted: refresh()
+    Component.onCompleted: {
+        loadOcrConfig();
+        refresh();
+    }
 }

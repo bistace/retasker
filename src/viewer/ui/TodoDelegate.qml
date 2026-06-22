@@ -7,6 +7,8 @@ Item {
     height: 320
 
     property string name
+    property string kind            // "image" (PNG snippet) | "text" (OCR result)
+    property string text
     property string imageUrl
     property bool done
     property string dateText
@@ -63,20 +65,38 @@ Item {
         }
     }
 
-    // Captured handwriting snippet.
+    // Captured handwriting snippet (kept when OCR is unavailable or unsure).
     Image {
         id: snippet
+        visible: row.kind === "image"
         anchors {
             left: check.right; leftMargin: 36
             right: date.left; rightMargin: 24
             top: parent.top; topMargin: 24
             bottom: parent.bottom; bottomMargin: 24
         }
-        source: row.imageUrl
+        source: row.kind === "image" ? row.imageUrl : ""
         fillMode: Image.PreserveAspectFit
         horizontalAlignment: Image.AlignLeft
         smooth: true
         asynchronous: true
+    }
+
+    // Transcribed text (replaces the snippet once OCR succeeds).
+    Text {
+        id: transcription
+        visible: row.kind === "text"
+        anchors {
+            left: check.right; leftMargin: 36
+            right: date.left; rightMargin: 24
+            verticalCenter: parent.verticalCenter
+        }
+        text: row.text
+        font.pixelSize: 40
+        color: "black"
+        wrapMode: Text.WordWrap
+        maximumLineCount: 4
+        elide: Text.ElideRight
     }
 
     Text {

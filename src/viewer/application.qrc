@@ -3,5 +3,6 @@
         <file>ui/main.qml</file>
         <file>ui/TodoDelegate.qml</file>
         <file>ui/store.js</file>
+        <file>ui/ocr.js</file>
     </qresource>
 </RCC>
