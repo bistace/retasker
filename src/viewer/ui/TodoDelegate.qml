@@ -111,7 +111,7 @@ Item {
 
     Text {
         id: date
-        anchors { right: parent.right; rightMargin: 36; top: parent.top; topMargin: 28 }
+        anchors { right: parent.right; rightMargin: 36; verticalCenter: parent.verticalCenter }
         text: row.dateText
         font.pixelSize: 30
         color: "black"
