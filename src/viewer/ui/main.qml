@@ -28,7 +28,13 @@ Rectangle {
     readonly property string capturesDir: appDir + "/captures"
     property string filter: "todo"          // "todo" | "done" | "all"
     property var doneMap: ({})
+
+    // Delete confirmation: pendingDelete holds the filename; the rest mirror the
+    // row's content so the modal can preview exactly which todo is going away.
     property string pendingDelete: ""
+    property string pendingKind: ""
+    property string pendingText: ""
+    property string pendingUrl: ""
 
     // OCR (config loaded from appDir/config.json; null disables transcription).
     // ocrTried guards against re-submitting the same capture within a session;
@@ -166,6 +172,15 @@ Rectangle {
     }
 
     function askDelete(name) {
+        for (var i = 0; i < rows.count; i++) {
+            var r = rows.get(i);
+            if (r.name === name) {
+                root.pendingKind = r.kind;
+                root.pendingText = r.text;
+                root.pendingUrl = r.url;
+                break;
+            }
+        }
         root.pendingDelete = name;
     }
 
@@ -297,22 +312,58 @@ Rectangle {
         Rectangle {
             anchors.centerIn: parent
             width: 720
-            height: 380
+            height: 560
             color: "white"
             border.color: "black"
             border.width: 4
 
             Text {
                 id: confirmTitle
-                anchors { top: parent.top; topMargin: 56; horizontalCenter: parent.horizontalCenter }
+                anchors { top: parent.top; topMargin: 48; horizontalCenter: parent.horizontalCenter }
                 text: "Delete this todo?"
                 font.pixelSize: 46
                 font.bold: true
                 color: "black"
             }
 
+            // Preview of the todo being deleted — the text, or the snippet image.
+            Rectangle {
+                id: preview
+                anchors {
+                    top: confirmTitle.bottom; topMargin: 32
+                    left: parent.left; leftMargin: 48
+                    right: parent.right; rightMargin: 48
+                }
+                height: 180
+                color: "white"
+                border.color: "black"
+                border.width: 2
+
+                Text {
+                    anchors { fill: parent; margins: 20 }
+                    visible: root.pendingKind === "text"
+                    text: root.pendingText
+                    font.pixelSize: 36
+                    color: "black"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 3
+                    elide: Text.ElideRight
+                }
+
+                Image {
+                    anchors { fill: parent; margins: 16 }
+                    visible: root.pendingKind === "image"
+                    source: root.pendingKind === "image" ? root.pendingUrl : ""
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    asynchronous: true
+                }
+            }
+
             Text {
-                anchors { top: confirmTitle.bottom; topMargin: 20; horizontalCenter: parent.horizontalCenter }
+                anchors { top: preview.bottom; topMargin: 24; horizontalCenter: parent.horizontalCenter }
                 text: "This cannot be undone."
                 font.pixelSize: 30
                 color: "black"
