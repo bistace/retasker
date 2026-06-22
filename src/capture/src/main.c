@@ -13,6 +13,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <dirent.h>
 #include <sys/stat.h>
 
 #include "../xovi.h"
@@ -211,6 +214,119 @@ char *transcribeHandler(const char *value) {
     if (!ok) return NULL;
     remove(png_path);
     fprintf(stderr, "[retasker] transcribed %s.png -> %s.txt\n", name, name);
+    return NULL;
+}
+
+#define XOCHITL_DIR "/home/root/.local/share/remarkable/xochitl"
+
+// Copy the string value of a top-level JSON "key":"value" into out. Minimal: only
+// quoted string values, handles a backslash-escaped char. Returns 1 if found.
+static int json_str(const char *json, const char *key, char *out, size_t outsize) {
+    char pat[64];
+    snprintf(pat, sizeof(pat), "\"%s\"", key);
+    const char *p = strstr(json, pat);
+    if (p == NULL) return 0;
+    p = strchr(p + strlen(pat), ':');
+    if (p == NULL) return 0;
+    p++;
+    while (*p == ' ' || *p == '\t') p++;
+    if (*p != '"') return 0;
+    p++;
+    size_t i = 0;
+    while (*p != '\0' && *p != '"' && i + 1 < outsize) {
+        if (*p == '\\' && p[1] != '\0') p++;
+        out[i++] = *p++;
+    }
+    out[i] = '\0';
+    return 1;
+}
+
+static int read_file(const char *path, char *buf, size_t bufsize) {
+    FILE *f = fopen(path, "r");
+    if (f == NULL) return -1;
+    size_t n = fread(buf, 1, bufsize - 1, f);
+    fclose(f);
+    buf[n] = '\0';
+    return (int) n;
+}
+
+static int has_metadata_suffix(const char *name) {
+    size_t n = strlen(name);
+    return n > 9 && strcmp(name + n - 9, ".metadata") == 0;
+}
+
+// Reads a metadata file and, if it matches type/visibleName (and parent when
+// given), copies its UUID (filename minus ".metadata") into uuid. Skips deleted.
+static int match_entry(const char *fname, const char *wantType,
+                       const char *wantName, const char *wantParent,
+                       char *uuid, size_t uuidSize) {
+    char path[512], buf[8192], type[32], vn[256], parent[64];
+    snprintf(path, sizeof(path), "%s/%s", XOCHITL_DIR, fname);
+    if (read_file(path, buf, sizeof(buf)) < 0) return 0;
+    if (strstr(buf, "\"deleted\": true") != NULL) return 0;
+    type[0] = vn[0] = parent[0] = '\0';
+    json_str(buf, "type", type, sizeof(type));
+    if (strcmp(type, wantType) != 0) return 0;
+    json_str(buf, "visibleName", vn, sizeof(vn));
+    if (strcmp(vn, wantName) != 0) return 0;
+    if (wantParent != NULL) {
+        json_str(buf, "parent", parent, sizeof(parent));
+        if (strcmp(parent, wantParent) != 0) return 0;
+    }
+    size_t len = strlen(fname) - 9;
+    if (len + 1 > uuidSize) return 0;
+    memcpy(uuid, fname, len);
+    uuid[len] = '\0';
+    return 1;
+}
+
+// export: invoked by xovi-message-broker for the "retasker.newnote" signal.
+// The AppLoad viewer (QML) can only reach native extensions via sendSimpleSignal,
+// never QML listeners. This bridges the gap. It also does the filesystem lookups
+// the QML side can't: finds the "reTasker" collection and, if a note with the
+// requested name already lives there, its UUID -- so the QML handler can open the
+// existing note instead of making a duplicate. Re-emits to the MainView handler
+// over the broker pipe (the 'u' route delivers to QML) as
+// {"name","folder","existing"}.
+char *newNoteHandler(const char *value) {
+    char name[256] = "";
+    if (value != NULL) json_str(value, "name", name, sizeof(name));
+    if (name[0] == '\0') strcpy(name, "reTasker note");
+
+    char folderId[64] = "", existing[64] = "";
+    DIR *d = opendir(XOCHITL_DIR);
+    if (d != NULL) {
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL) {
+            if (!has_metadata_suffix(e->d_name)) continue;
+            if (match_entry(e->d_name, "CollectionType", "reTasker", NULL, folderId, sizeof(folderId)))
+                break;
+        }
+        if (folderId[0] != '\0') {
+            rewinddir(d);
+            while ((e = readdir(d)) != NULL) {
+                if (!has_metadata_suffix(e->d_name)) continue;
+                if (match_entry(e->d_name, "DocumentType", name, folderId, existing, sizeof(existing)))
+                    break;
+            }
+        }
+        closedir(d);
+    }
+
+    int fd = open("/run/xovi-mb", O_WRONLY);
+    if (fd < 0) {
+        fprintf(stderr, "[retasker] newnote: cannot open broker pipe\n");
+        return NULL;
+    }
+    char out[1100];
+    int n = snprintf(out, sizeof(out),
+                     "uretasker.newnote:{\"name\":\"%s\",\"folder\":\"%s\",\"existing\":\"%s\"}\n",
+                     name, folderId, existing);
+    if (n > 0 && n < (int) sizeof(out)) {
+        if (write(fd, out, (size_t) n) < 0)
+            fprintf(stderr, "[retasker] newnote: pipe write failed\n");
+    }
+    close(fd);
     return NULL;
 }
 

@@ -22,3 +22,9 @@ with
     xovi-message-broker$simpleSignal = "retasker.transcribe"
     xovi-message-broker$version = 1
 end
+
+export newNoteHandler
+with
+    xovi-message-broker$simpleSignal = "retasker.newnote"
+    xovi-message-broker$version = 1
+end
