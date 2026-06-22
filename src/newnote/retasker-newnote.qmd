@@ -1,0 +1,56 @@
+; reTasker: create or open a real notebook from the viewer.
+;
+; Injects a message-broker listener into MainView.qml (the always-instantiated
+; top-level view container) so it is alive on the home screen and inside a
+; notebook alike. The AppLoad viewer can't reach xochitl's controllers (separate
+; QML engine), so it fires "retasker.newnote"; the native bridge in
+; retasker-capture.so does the filesystem lookups (the "reTasker" folder, and any
+; existing note with the same name) and forwards here over the broker pipe.
+;
+; Payload is JSON: {"name":"<title>","folder":"<uuid|empty>","existing":"<uuid|empty>"}.
+; If a note for that day already exists we just open it; otherwise we create one
+; in the reTasker collection (creating the collection if the bridge found none)
+; and open it -- using xochitl's own path, so no restart and correct on-disk format.
+;
+; Plaintext identifiers resolve via the qt-resource-rebuilder hashtab, same as
+; the other reTasker qmds.
+
+AFFECT /qml/device/view/main/MainView.qml
+    IMPORT net.asivery.XoviMessageBroker 2.0
+
+    TRAVERSE ?#root
+        LOCATE AFTER ALL
+        INSERT {
+            XoviMessageBroker {
+                id: retaskerNoteBroker
+                listeningFor: ["retasker.newnote"]
+
+                function onSignalReceived(sgn, message) {
+                    var req = {};
+                    try { req = JSON.parse(message); } catch (e) { req = {}; }
+                    var name = req.name ? req.name : "reTasker note";
+
+                    // A note for this day already exists -> just open it.
+                    if (req.existing && Library.entryForId(req.existing)) {
+                        root.explorer.open(req.existing);
+                        print("[retasker-newnote] opened existing " + req.existing + " name='" + name + "'");
+                        return req.existing;
+                    }
+
+                    // Reuse the reTasker folder the bridge found, else create it.
+                    var folderId = req.folder;
+                    if (!folderId || !Library.entryForId(folderId))
+                        folderId = Library.createCollectionWrapper("", "reTasker");
+
+                    var id = LibraryController.createDocument(folderId, name);
+                    var doc = Library.entryForId(id);
+                    if (!doc) { print("[retasker-newnote] entryForId NULL for id=" + id); return "" + id; }
+                    LibraryController.setOrientation(doc.id, Qt.Vertical);
+                    root.explorer.open(doc.id);
+                    print("[retasker-newnote] created+opened " + doc.id + " in folder " + folderId + " name='" + name + "'");
+                    return "" + id;
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT
