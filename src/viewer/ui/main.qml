@@ -62,6 +62,7 @@ Rectangle {
         id: settings
         category: "retasker"
         property string doneJson: "{}"
+        property string viewMode: "list"    // remembered across sessions
     }
 
     // Native side (retasker-capture.so) handles the actual file removal.
@@ -303,7 +304,12 @@ Rectangle {
                         }
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: { root.viewMode = modelData.key; root.selectedDay = ""; root.refresh(); }
+                            onClicked: {
+                                root.viewMode = modelData.key;
+                                settings.viewMode = modelData.key;
+                                root.selectedDay = "";
+                                root.refresh();
+                            }
                         }
                     }
                 }
@@ -568,6 +574,7 @@ Rectangle {
         root.shownYear = now.getFullYear();
         root.shownMonth = now.getMonth();
         root.todayKey = Cal.dateKey(now);
+        root.viewMode = settings.viewMode;
         loadOcrConfig();
         refresh();
     }
