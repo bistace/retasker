@@ -17,51 +17,96 @@ Item {
     signal prevMonth
     signal nextMonth
 
-    readonly property var monthNames: ["January", "February", "March", "April", "May", "June",
-                                       "July", "August", "September", "October", "November", "December"]
+    readonly property var monthNames: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
     readonly property var weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     readonly property var cells: Cal.monthGrid(monthView.year, monthView.month)
 
     // --- Month nav --------------------------------------------------------
     Item {
         id: nav
-        anchors { top: parent.top; left: parent.left; right: parent.right }
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+        }
         height: 104
 
         Rectangle {
-            anchors { left: parent.left; leftMargin: 32; verticalCenter: parent.verticalCenter }
-            width: 96; height: 76
-            color: "white"; border.color: "black"; border.width: 2
-            Text { anchors.centerIn: parent; text: "‹"; font.pixelSize: 48; color: "black" }
-            MouseArea { anchors.fill: parent; onClicked: monthView.prevMonth() }
+            anchors {
+                left: parent.left
+                leftMargin: 32
+                verticalCenter: parent.verticalCenter
+            }
+            width: 96
+            height: 76
+            color: "white"
+            border.color: "black"
+            border.width: 2
+            Text {
+                anchors.centerIn: parent
+                text: "‹"
+                font.pixelSize: 48
+                color: "black"
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: monthView.prevMonth()
+            }
         }
 
         Text {
             anchors.centerIn: parent
             text: monthView.monthNames[monthView.month] + " " + monthView.year
-            font.pixelSize: 44; font.bold: true; color: "black"
+            font.pixelSize: 44
+            font.bold: true
+            color: "black"
         }
 
         Rectangle {
-            anchors { right: parent.right; rightMargin: 32; verticalCenter: parent.verticalCenter }
-            width: 96; height: 76
-            color: "white"; border.color: "black"; border.width: 2
-            Text { anchors.centerIn: parent; text: "›"; font.pixelSize: 48; color: "black" }
-            MouseArea { anchors.fill: parent; onClicked: monthView.nextMonth() }
+            anchors {
+                right: parent.right
+                rightMargin: 32
+                verticalCenter: parent.verticalCenter
+            }
+            width: 96
+            height: 76
+            color: "white"
+            border.color: "black"
+            border.width: 2
+            Text {
+                anchors.centerIn: parent
+                text: "›"
+                font.pixelSize: 48
+                color: "black"
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: monthView.nextMonth()
+            }
         }
     }
 
     // --- Weekday header ---------------------------------------------------
     Row {
         id: weekHeader
-        anchors { top: nav.bottom; topMargin: 8; left: parent.left; right: parent.right }
+        anchors {
+            top: nav.bottom
+            topMargin: 8
+            left: parent.left
+            right: parent.right
+        }
         Repeater {
             model: monthView.weekdays
             delegate: Item {
                 required property var modelData
                 width: monthView.width / 7
                 height: 56
-                Text { anchors.centerIn: parent; text: modelData; font.pixelSize: 28; color: "black" }
+                Text {
+                    anchors.centerIn: parent
+                    text: modelData
+                    font.pixelSize: 28
+                    color: "black"
+                }
             }
         }
     }
@@ -69,7 +114,12 @@ Item {
     // --- Day grid ---------------------------------------------------------
     Grid {
         id: grid
-        anchors { top: weekHeader.bottom; left: parent.left; right: parent.right; bottom: parent.bottom }
+        anchors {
+            top: weekHeader.bottom
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
+        }
         columns: 7
         readonly property real cellW: width / 7
         readonly property real cellH: height / (monthView.cells.length / 7)
@@ -98,7 +148,12 @@ Item {
                     border.width: cell.isSelected ? 6 : (cell.isToday ? 4 : 1)
 
                     Text {
-                        anchors { top: parent.top; left: parent.left; topMargin: 12; leftMargin: 14 }
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            topMargin: 12
+                            leftMargin: 14
+                        }
                         text: cell.modelData ? cell.modelData.day : ""
                         font.pixelSize: 30
                         font.bold: cell.isToday
@@ -108,14 +163,18 @@ Item {
                     // Status marker: filled+check when all done, open ring when pending.
                     Rectangle {
                         anchors.centerIn: parent
-                        width: 56; height: 56; radius: 28
+                        width: 56
+                        height: 56
+                        radius: 28
                         visible: cell.total > 0
                         color: cell.allDone ? "black" : "white"
-                        border.color: "black"; border.width: 4
+                        border.color: "black"
+                        border.width: 4
 
                         Canvas {
                             anchors.centerIn: parent
-                            width: 34; height: 34
+                            width: 34
+                            height: 34
                             visible: cell.allDone
                             onPaint: {
                                 var ctx = getContext("2d");
@@ -130,7 +189,8 @@ Item {
                                 ctx.lineTo(width * 0.84, height * 0.24);
                                 ctx.stroke();
                             }
-                            onVisibleChanged: if (visible) requestPaint()
+                            onVisibleChanged: if (visible)
+                                requestPaint()
                             Component.onCompleted: requestPaint()
                         }
                     }

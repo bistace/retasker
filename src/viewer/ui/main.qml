@@ -23,7 +23,8 @@ Rectangle {
 
     // AppLoad lifecycle contract: the root must expose these.
     signal close
-    function unloading() {}
+    function unloading() {
+    }
 
     readonly property string appDir: "file:///home/root/xovi/exthome/appload/retasker"
     readonly property string capturesDir: appDir + "/captures"
@@ -71,7 +72,9 @@ Rectangle {
     }
 
     // Native side (retasker-capture.so) handles the actual file removal.
-    XoviMessageBroker { id: broker }
+    XoviMessageBroker {
+        id: broker
+    }
 
     FolderListModel {
         id: folder
@@ -79,10 +82,13 @@ Rectangle {
         showDirs: false
         showFiles: true
         nameFilters: ["*.png", "*.txt"]
-        onStatusChanged: if (folder.status === FolderListModel.Ready) root.refresh()
+        onStatusChanged: if (folder.status === FolderListModel.Ready)
+            root.refresh()
     }
 
-    ListModel { id: rows }
+    ListModel {
+        id: rows
+    }
 
     function refresh() {
         try {
@@ -98,7 +104,9 @@ Rectangle {
         var visible = Store.view(entries, root.doneMap, effFilter);
         if (root.viewMode === "calendar") {
             if (root.selectedDay !== "")
-                visible = visible.filter(function (v) { return Cal.dateKey(v.mtime) === root.selectedDay; });
+                visible = visible.filter(function (v) {
+                    return Cal.dateKey(v.mtime) === root.selectedDay;
+                });
             else
                 visible = visible.filter(function (v) {
                     return v.mtime.getFullYear() === root.shownYear && v.mtime.getMonth() === root.shownMonth;
@@ -241,8 +249,14 @@ Rectangle {
     function shiftMonth(delta) {
         var m = root.shownMonth + delta;
         var y = root.shownYear;
-        while (m < 0) { m += 12; y -= 1; }
-        while (m > 11) { m -= 12; y += 1; }
+        while (m < 0) {
+            m += 12;
+            y -= 1;
+        }
+        while (m > 11) {
+            m -= 12;
+            y += 1;
+        }
         root.shownMonth = m;
         root.shownYear = y;
         root.selectedDay = "";
@@ -305,13 +319,22 @@ Rectangle {
     // --- Header: title, filter segments, close ---------------------------
     Rectangle {
         id: header
-        anchors { top: parent.top; left: parent.left; right: parent.right }
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+        }
         height: 240
         color: "white"
 
         Text {
             id: title
-            anchors { left: parent.left; leftMargin: root.settingsOpen ? 112 : 32; top: parent.top; topMargin: 24 }
+            anchors {
+                left: parent.left
+                leftMargin: root.settingsOpen ? 112 : 32
+                top: parent.top
+                topMargin: 24
+            }
             text: root.settingsOpen ? "Settings" : "reTasker"
             font.pixelSize: 56
             font.bold: true
@@ -323,7 +346,11 @@ Rectangle {
             width: 56
             height: 56
             visible: root.settingsOpen
-            anchors { left: parent.left; leftMargin: 32; verticalCenter: title.verticalCenter }
+            anchors {
+                left: parent.left
+                leftMargin: 32
+                verticalCenter: title.verticalCenter
+            }
             Canvas {
                 anchors.fill: parent
                 onPaint: {
@@ -341,17 +368,43 @@ Rectangle {
                 }
                 Component.onCompleted: requestPaint()
             }
-            MouseArea { anchors.fill: parent; anchors.margins: -24; onClicked: root.settingsOpen = false }
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -24
+                onClicked: root.settingsOpen = false
+            }
         }
 
         Item {
             id: closeBtn
             width: 52
             height: 52
-            anchors { right: parent.right; rightMargin: 40; verticalCenter: title.verticalCenter }
-            Rectangle { anchors.centerIn: parent; width: parent.width; height: 6; radius: 3; color: "black"; rotation: 45 }
-            Rectangle { anchors.centerIn: parent; width: parent.width; height: 6; radius: 3; color: "black"; rotation: -45 }
-            MouseArea { anchors.fill: parent; anchors.margins: -24; onClicked: root.close() }
+            anchors {
+                right: parent.right
+                rightMargin: 40
+                verticalCenter: title.verticalCenter
+            }
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width
+                height: 6
+                radius: 3
+                color: "black"
+                rotation: 45
+            }
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width
+                height: 6
+                radius: 3
+                color: "black"
+                rotation: -45
+            }
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -24
+                onClicked: root.close()
+            }
         }
 
         Item {
@@ -359,7 +412,11 @@ Rectangle {
             width: 56
             height: 56
             visible: !root.settingsOpen
-            anchors { right: closeBtn.left; rightMargin: 44; verticalCenter: title.verticalCenter }
+            anchors {
+                right: closeBtn.left
+                rightMargin: 44
+                verticalCenter: title.verticalCenter
+            }
             Canvas {
                 anchors.fill: parent
                 onPaint: {
@@ -389,11 +446,20 @@ Rectangle {
                 }
                 Component.onCompleted: requestPaint()
             }
-            MouseArea { anchors.fill: parent; anchors.margins: -24; onClicked: root.settingsOpen = true }
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -24
+                onClicked: root.settingsOpen = true
+            }
         }
 
         Row {
-            anchors { left: parent.left; leftMargin: 32; top: title.bottom; topMargin: 28 }
+            anchors {
+                left: parent.left
+                leftMargin: 32
+                top: title.bottom
+                topMargin: 28
+            }
             spacing: 24
             visible: !root.settingsOpen
 
@@ -402,8 +468,14 @@ Rectangle {
                 spacing: 0
                 Repeater {
                     model: [
-                        { key: "list", text: "List" },
-                        { key: "calendar", text: "Calendar" }
+                        {
+                            key: "list",
+                            text: "List"
+                        },
+                        {
+                            key: "calendar",
+                            text: "Calendar"
+                        }
                     ]
                     delegate: Rectangle {
                         required property var modelData
@@ -437,9 +509,18 @@ Rectangle {
                 visible: root.viewMode === "list"
                 Repeater {
                     model: [
-                        { key: "todo", text: "To do" },
-                        { key: "done", text: "Done" },
-                        { key: "all", text: "All" }
+                        {
+                            key: "todo",
+                            text: "To do"
+                        },
+                        {
+                            key: "done",
+                            text: "Done"
+                        },
+                        {
+                            key: "all",
+                            text: "All"
+                        }
                     ]
                     delegate: Rectangle {
                         required property var modelData
@@ -456,7 +537,10 @@ Rectangle {
                         }
                         MouseArea {
                             anchors.fill: parent
-                            onClicked: { root.filter = modelData.key; root.refresh(); }
+                            onClicked: {
+                                root.filter = modelData.key;
+                                root.refresh();
+                            }
                         }
                     }
                 }
@@ -464,7 +548,11 @@ Rectangle {
         }
 
         Rectangle {
-            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            anchors {
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+            }
             height: 3
             color: "black"
         }
@@ -473,7 +561,11 @@ Rectangle {
     // --- Month calendar (upper pane in calendar view) ---------------------
     MonthView {
         id: monthPane
-        anchors { top: header.bottom; left: parent.left; right: parent.right }
+        anchors {
+            top: header.bottom
+            left: parent.left
+            right: parent.right
+        }
         height: (root.height - header.height) * 0.58
         visible: !root.settingsOpen && root.viewMode === "calendar"
         year: root.shownYear
@@ -493,13 +585,21 @@ Rectangle {
     // or the selected day with a tap-to-clear back to the whole month.
     Rectangle {
         id: listBar
-        anchors { top: monthPane.bottom; left: parent.left; right: parent.right }
+        anchors {
+            top: monthPane.bottom
+            left: parent.left
+            right: parent.right
+        }
         height: 72
         visible: !root.settingsOpen && root.viewMode === "calendar"
         color: "white"
 
         Row {
-            anchors { left: parent.left; leftMargin: 32; verticalCenter: parent.verticalCenter }
+            anchors {
+                left: parent.left
+                leftMargin: 32
+                verticalCenter: parent.verticalCenter
+            }
             spacing: 20
 
             Text {
@@ -513,13 +613,16 @@ Rectangle {
             // Whole-month-done badge (only on the month label, not a day view).
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
-                width: 48; height: 48; radius: 24
+                width: 48
+                height: 48
+                radius: 24
                 visible: root.selectedDay === "" && root.monthAllDone
                 color: "black"
 
                 Canvas {
                     anchors.centerIn: parent
-                    width: 30; height: 30
+                    width: 30
+                    height: 30
                     onPaint: {
                         var ctx = getContext("2d");
                         ctx.reset();
@@ -533,7 +636,8 @@ Rectangle {
                         ctx.lineTo(width * 0.84, height * 0.24);
                         ctx.stroke();
                     }
-                    onVisibleChanged: if (visible) requestPaint()
+                    onVisibleChanged: if (visible)
+                        requestPaint()
                     Component.onCompleted: requestPaint()
                 }
             }
@@ -541,7 +645,10 @@ Rectangle {
         MouseArea {
             anchors.fill: parent
             enabled: root.selectedDay !== ""
-            onClicked: { root.selectedDay = ""; root.refresh(); }
+            onClicked: {
+                root.selectedDay = "";
+                root.refresh();
+            }
         }
 
         // Create a real notebook for the selected day (or today), filed in the
@@ -550,7 +657,11 @@ Rectangle {
         // MainView handler; closing the viewer drops the user into the new note.
         Rectangle {
             id: newNoteBtn
-            anchors { right: parent.right; rightMargin: 32; verticalCenter: parent.verticalCenter }
+            anchors {
+                right: parent.right
+                rightMargin: 32
+                verticalCenter: parent.verticalCenter
+            }
             width: 300
             height: 60
             color: "black"
@@ -574,7 +685,11 @@ Rectangle {
         }
 
         Rectangle {
-            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            anchors {
+                left: parent.left
+                right: parent.right
+                bottom: parent.bottom
+            }
             height: 2
             color: "black"
         }
@@ -587,7 +702,9 @@ Rectangle {
         id: list
         anchors {
             top: root.viewMode === "calendar" ? listBar.bottom : header.bottom
-            left: parent.left; right: parent.right; bottom: parent.bottom
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
         }
         visible: !root.settingsOpen
         model: rows
@@ -620,12 +737,21 @@ Rectangle {
     // --- Settings ---------------------------------------------------------
     Rectangle {
         id: settingsPage
-        anchors { top: header.bottom; left: parent.left; right: parent.right; bottom: parent.bottom }
+        anchors {
+            top: header.bottom
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
+        }
         visible: root.settingsOpen
         color: "white"
 
         Column {
-            anchors { top: parent.top; left: parent.left; right: parent.right }
+            anchors {
+                top: parent.top
+                left: parent.left
+                right: parent.right
+            }
 
             Rectangle {
                 width: parent.width
@@ -633,7 +759,11 @@ Rectangle {
                 color: "white"
 
                 Column {
-                    anchors { left: parent.left; leftMargin: 32; verticalCenter: parent.verticalCenter }
+                    anchors {
+                        left: parent.left
+                        leftMargin: 32
+                        verticalCenter: parent.verticalCenter
+                    }
                     width: parent.width - 420
                     spacing: 10
                     Text {
@@ -652,7 +782,11 @@ Rectangle {
                 }
 
                 Row {
-                    anchors { right: parent.right; rightMargin: 32; verticalCenter: parent.verticalCenter }
+                    anchors {
+                        right: parent.right
+                        rightMargin: 32
+                        verticalCenter: parent.verticalCenter
+                    }
                     spacing: 20
 
                     Rectangle {
@@ -661,8 +795,16 @@ Rectangle {
                         color: "white"
                         border.color: "black"
                         border.width: 3
-                        Text { anchors.centerIn: parent; text: "Reset"; font.pixelSize: 32; color: "black" }
-                        MouseArea { anchors.fill: parent; onClicked: root.resetDefaultTemplate() }
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Reset"
+                            font.pixelSize: 32
+                            color: "black"
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: root.resetDefaultTemplate()
+                        }
                     }
 
                     Rectangle {
@@ -671,13 +813,25 @@ Rectangle {
                         color: "black"
                         border.color: "black"
                         border.width: 3
-                        Text { anchors.centerIn: parent; text: "Choose"; font.pixelSize: 32; color: "white" }
-                        MouseArea { anchors.fill: parent; onClicked: root.chooseDefaultTemplate() }
+                        Text {
+                            anchors.centerIn: parent
+                            text: "Choose"
+                            font.pixelSize: 32
+                            color: "white"
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: root.chooseDefaultTemplate()
+                        }
                     }
                 }
 
                 Rectangle {
-                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        bottom: parent.bottom
+                    }
                     height: 2
                     color: "black"
                 }
@@ -694,7 +848,9 @@ Rectangle {
         color: "white"
 
         // Swallow taps so nothing behind the modal reacts.
-        MouseArea { anchors.fill: parent }
+        MouseArea {
+            anchors.fill: parent
+        }
 
         Rectangle {
             anchors.centerIn: parent
@@ -706,7 +862,11 @@ Rectangle {
 
             Text {
                 id: confirmTitle
-                anchors { top: parent.top; topMargin: 48; horizontalCenter: parent.horizontalCenter }
+                anchors {
+                    top: parent.top
+                    topMargin: 48
+                    horizontalCenter: parent.horizontalCenter
+                }
                 text: "Delete this todo?"
                 font.pixelSize: 46
                 font.bold: true
@@ -717,9 +877,12 @@ Rectangle {
             Rectangle {
                 id: preview
                 anchors {
-                    top: confirmTitle.bottom; topMargin: 32
-                    left: parent.left; leftMargin: 48
-                    right: parent.right; rightMargin: 48
+                    top: confirmTitle.bottom
+                    topMargin: 32
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
                 }
                 height: 180
                 color: "white"
@@ -727,7 +890,10 @@ Rectangle {
                 border.width: 2
 
                 Text {
-                    anchors { fill: parent; margins: 20 }
+                    anchors {
+                        fill: parent
+                        margins: 20
+                    }
                     visible: root.pendingKind === "text"
                     text: root.pendingText
                     font.pixelSize: 36
@@ -740,7 +906,10 @@ Rectangle {
                 }
 
                 Image {
-                    anchors { fill: parent; margins: 16 }
+                    anchors {
+                        fill: parent
+                        margins: 16
+                    }
                     visible: root.pendingKind === "image"
                     source: root.pendingKind === "image" ? root.pendingUrl : ""
                     fillMode: Image.PreserveAspectFit
@@ -750,14 +919,22 @@ Rectangle {
             }
 
             Text {
-                anchors { top: preview.bottom; topMargin: 24; horizontalCenter: parent.horizontalCenter }
+                anchors {
+                    top: preview.bottom
+                    topMargin: 24
+                    horizontalCenter: parent.horizontalCenter
+                }
                 text: "This cannot be undone."
                 font.pixelSize: 30
                 color: "black"
             }
 
             Row {
-                anchors { bottom: parent.bottom; bottomMargin: 48; horizontalCenter: parent.horizontalCenter }
+                anchors {
+                    bottom: parent.bottom
+                    bottomMargin: 48
+                    horizontalCenter: parent.horizontalCenter
+                }
                 spacing: 40
 
                 Rectangle {
@@ -766,8 +943,16 @@ Rectangle {
                     color: "white"
                     border.color: "black"
                     border.width: 3
-                    Text { anchors.centerIn: parent; text: "Cancel"; font.pixelSize: 40; color: "black" }
-                    MouseArea { anchors.fill: parent; onClicked: root.pendingDelete = "" }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Cancel"
+                        font.pixelSize: 40
+                        color: "black"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.pendingDelete = ""
+                    }
                 }
 
                 Rectangle {
@@ -776,8 +961,16 @@ Rectangle {
                     color: "black"
                     border.color: "black"
                     border.width: 3
-                    Text { anchors.centerIn: parent; text: "Delete"; font.pixelSize: 40; color: "white" }
-                    MouseArea { anchors.fill: parent; onClicked: root.confirmDelete() }
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Delete"
+                        font.pixelSize: 40
+                        color: "white"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.confirmDelete()
+                    }
                 }
             }
         }

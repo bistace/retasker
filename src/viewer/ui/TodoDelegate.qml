@@ -8,9 +8,7 @@ import QtQuick
 // wall of whitespace.
 Item {
     id: row
-    height: row.kind === "text"
-            ? Math.max(transcription.implicitHeight + 2 * vpad, minHeight)
-            : imageHeight
+    height: row.kind === "text" ? Math.max(transcription.implicitHeight + 2 * vpad, minHeight) : imageHeight
 
     readonly property int vpad: 28
     readonly property int minHeight: 124
@@ -37,7 +35,11 @@ Item {
     // Toggle circle (large tap target on the left).
     Rectangle {
         id: check
-        anchors { left: parent.left; leftMargin: 36; verticalCenter: parent.verticalCenter }
+        anchors {
+            left: parent.left
+            leftMargin: 36
+            verticalCenter: parent.verticalCenter
+        }
         width: 56
         height: 56
         radius: width / 2
@@ -64,7 +66,8 @@ Item {
                 ctx.lineTo(width * 0.84, height * 0.24);
                 ctx.stroke();
             }
-            onVisibleChanged: if (visible) requestPaint()
+            onVisibleChanged: if (visible)
+                requestPaint()
             Component.onCompleted: requestPaint()
         }
 
@@ -80,10 +83,14 @@ Item {
         id: snippet
         visible: row.kind === "image"
         anchors {
-            left: check.right; leftMargin: 36
-            right: date.left; rightMargin: 24
-            top: parent.top; topMargin: 24
-            bottom: parent.bottom; bottomMargin: 24
+            left: check.right
+            leftMargin: 36
+            right: date.left
+            rightMargin: 24
+            top: parent.top
+            topMargin: 24
+            bottom: parent.bottom
+            bottomMargin: 24
         }
         source: row.kind === "image" ? row.imageUrl : ""
         fillMode: Image.PreserveAspectFit
@@ -97,8 +104,10 @@ Item {
         id: transcription
         visible: row.kind === "text"
         anchors {
-            left: check.right; leftMargin: 36
-            right: date.left; rightMargin: 24
+            left: check.right
+            leftMargin: 36
+            right: date.left
+            rightMargin: 24
             verticalCenter: parent.verticalCenter
         }
         text: row.text
@@ -111,14 +120,22 @@ Item {
 
     Text {
         id: date
-        anchors { right: parent.right; rightMargin: 36; verticalCenter: parent.verticalCenter }
+        anchors {
+            right: parent.right
+            rightMargin: 36
+            verticalCenter: parent.verticalCenter
+        }
         text: row.dateText
         font.pixelSize: 30
         color: "black"
     }
 
     Rectangle {
-        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+        anchors {
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
+        }
         height: 2
         color: "black"
     }
