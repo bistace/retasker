@@ -3,6 +3,6 @@
     "loadsBackend": false,
     "entry": "/ui/main.qml",
     "id": "retasker",
-    "supportsScaling": true,
+    "supportsScaling": false,
     "canHaveMultipleFrontends": false
 }

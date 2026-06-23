@@ -1,0 +1,118 @@
+; reTasker: prevent AppLoad's fullscreen chrome trigger from overlapping
+; reTasker's own top-right controls.
+;
+; AppLoad's fullscreen window wrapper ships a high-z Button in the top-right
+; corner that reveals the AppLoad X/window bar. That overlaps reTasker's own
+; close/settings controls, so disable that trigger and suppress the topbar for
+; the reTasker app window. The wrapper title can briefly stay as AppLoad's
+; default title, so track the loaded application id instead of matching title.
+;
+; AppLoad's launcher grid can also call launchWindow(modelData) with incomplete
+; model data after a frontend has just unloaded. The stock function creates a
+; wrapper before assigning modelData.name, so that error leaves a visible
+; orphan "<AppLoad Window>" bar. Guard and sanitize that path too.
+
+AFFECT /appload/qml/appload.qml
+    TRAVERSE ?#_appLoadView
+        REPLACE launchWindow WITH {
+            function launchWindow(modelData, extraArgs, extraEnv) {
+                if (!modelData || !modelData.id) {
+                    for (let candidate of library.applications) {
+                        if (candidate.id === "retasker") {
+                            modelData = candidate;
+                            break;
+                        }
+                    }
+                }
+                if (!modelData || !modelData.id) {
+                    console.log("[retasker] ignoring AppLoad launch with incomplete modelData");
+                    return { maximize: function () {} };
+                }
+
+                let qtfbKey = -1;
+                let win;
+                const isRetasker = modelData.id === "retasker";
+                const externalType = modelData.externalType === undefined ? 0 /* INTERNAL */ : modelData.externalType;
+                if(externalType === 2 /* EXTERNAL_QTFB */) {
+                    qtfbKey = Math.floor(Math.random() * 10000000);
+                }
+                if(externalType != 1 /* EXTERNAL_NOGUI */) {
+                    /* Create a new window*/
+                    if(library.isFrontendRunningFor(modelData.id) && !modelData.canHaveMultipleFrontends) {
+                        console.log("Cannot load multiple frontends for app. It doesn't support it.");
+                        return { maximize: function () {} };
+                    }
+                    if(windowArchetype.status !== Component.Ready) {
+                        console.log("Window object not ready: " + windowArchetype.status);
+                        console.log(windowArchetype.errorString());
+                        return { maximize: function () {} };
+                    }
+                    win = windowArchetype.createObject(absoluteRoot, { x: 100, y: 100 });
+                    if(win == null) {
+                        console.log("Failed to instantiate a window object!");
+                        return { maximize: function () {} };
+                    }
+                    win.appName = modelData.name ? modelData.name : (isRetasker ? "reTasker" : "<AppLoad Window>");
+                    win.supportsScaling = modelData.supportsScaling === true;
+                    win.virtualKeyboardLayout = modelData.virtualKeyboardLayout ? modelData.virtualKeyboardLayout : null;
+                    win.disablesWindowedMode = isRetasker || modelData.disablesWindowedMode === true;
+                    win.virtualKeyboardRef = _appLoadView.virtualKeyboardRef;
+                    win.globalWidth = Qt.binding(function() { return _appLoadView.width; })
+                    win.globalHeight = Qt.binding(function() { return _appLoadView.height; })
+                    let deviceAspectRatio = "original";
+                    let applicationAspectRatio = modelData.aspectRatio ? modelData.aspectRatio : "auto";
+                    const aspectRatioId = _appLoadView.width < _appLoadView.height ? Math.round(100 * _appLoadView.width / _appLoadView.height) : Math.round(100 * _appLoadView.height / _appLoadView.width);
+                    switch(aspectRatioId) {
+                        case 75:
+                            deviceAspectRatio = "original";
+                            break;
+                        case 56:
+                            deviceAspectRatio = "move";
+                            break
+                    }
+                    const realAspectRatio = applicationAspectRatio == "auto" ? deviceAspectRatio : applicationAspectRatio;
+                    console.log("Application starting on device with " + deviceAspectRatio + " aspect ratio (" + aspectRatioId + "). Real aspect ratio of the application is going to be " + realAspectRatio);
+                    [win.minWidth, win.minHeight] = [win.implicitWidth, win.implicitHeight] = getMinResolutionFor(realAspectRatio);
+                    [win.scaledContentWidth, win.scaledContentHeight] = getResolutionOf(realAspectRatio);
+                    win.qtfbKey = qtfbKey;
+                    win.closed.connect(() => win.destroy());
+                }
+                if(externalType == 0 /* INTERNAL */) {
+                    win.loadApplication(modelData.id);
+                } else if(externalType == 1 /* EXTERNAL_NOGUI */ || externalType == 2 /* EXTERNAL_QTFB */) {
+                    win.appPid = library.launchExternal(modelData.id, qtfbKey, extraArgs || [], extraEnv || {});
+                }
+                return win;
+            }
+        }
+    END TRAVERSE
+
+END AFFECT
+
+AFFECT /appload/qml/window.qml
+    TRAVERSE ?#root
+        LOCATE BEFORE ALL
+        INSERT {
+            property string retaskerLoadedAppId: ""
+        }
+
+        REPLACE loadApplication WITH {
+            function loadApplication(appId) {
+                root.retaskerLoadedAppId = appId;
+                coord.loadApplication(appId);
+            }
+        }
+    END TRAVERSE
+
+    TRAVERSE ?#topbar
+        REPLACE visible WITH {
+            visible: root.retaskerLoadedAppId !== "retasker" && (!fullscreen || forceTopBarVisible)
+        }
+    END TRAVERSE
+
+    TRAVERSE ?#qmldiffReplaceMeButton
+        REPLACE visible WITH {
+            visible: false
+        }
+    END TRAVERSE
+END AFFECT
