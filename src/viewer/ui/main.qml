@@ -41,6 +41,7 @@ Rectangle {
     property int shownYear: 0
     property int shownMonth: 0               // 0-based
     property string todayKey: ""
+    property bool settingsOpen: false
     readonly property string monthLabel: Qt.formatDate(new Date(root.shownYear, root.shownMonth, 1), "MMMM yyyy")
     readonly property var monthCounts: Cal.monthCounts(root.dayIndex, root.shownYear, root.shownMonth)
     readonly property bool monthAllDone: monthCounts.total > 0 && monthCounts.done === monthCounts.total
@@ -63,6 +64,10 @@ Rectangle {
         category: "retasker"
         property string doneJson: "{}"
         property string viewMode: "list"    // remembered across sessions
+        property string noteTemplateFilename: ""
+        property string noteTemplateName: "Blank"
+        property bool noteTemplateLandscape: false
+        property bool openSettingsOnStart: false
     }
 
     // Native side (retasker-capture.so) handles the actual file removal.
@@ -251,6 +256,52 @@ Rectangle {
         return Qt.formatDate(new Date(p[0], p[1] - 1, p[2]), "d MMMM yyyy");
     }
 
+    function templateLabel() {
+        return settings.noteTemplateName ? settings.noteTemplateName : "Blank";
+    }
+
+    function chooseDefaultTemplate() {
+        settings.openSettingsOnStart = true;
+        broker.sendSimpleSignal("retasker.chooseTemplate", JSON.stringify({
+            template: settings.noteTemplateFilename
+        }));
+        root.close();
+    }
+
+    function resetDefaultTemplate() {
+        settings.noteTemplateFilename = "";
+        settings.noteTemplateName = "Blank";
+        settings.noteTemplateLandscape = false;
+        broker.sendSimpleSignal("retasker.template", JSON.stringify({
+            filename: "",
+            name: "Blank",
+            landscape: false
+        }));
+    }
+
+    function applyTemplateConfig(cfg) {
+        settings.noteTemplateFilename = cfg && cfg.filename ? cfg.filename : "";
+        settings.noteTemplateName = cfg && cfg.name ? cfg.name : "Blank";
+        settings.noteTemplateLandscape = cfg && cfg.landscape === true;
+    }
+
+    function loadTemplateConfig() {
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", root.appDir + "/template.json");
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== XMLHttpRequest.DONE)
+                return;
+            if (!xhr.responseText)
+                return;
+            try {
+                root.applyTemplateConfig(JSON.parse(xhr.responseText));
+            } catch (e) {
+                root.applyTemplateConfig({});
+            }
+        };
+        xhr.send();
+    }
+
     // --- Header: title, filter segments, close ---------------------------
     Rectangle {
         id: header
@@ -260,11 +311,37 @@ Rectangle {
 
         Text {
             id: title
-            anchors { left: parent.left; leftMargin: 32; top: parent.top; topMargin: 24 }
-            text: "reTasker"
+            anchors { left: parent.left; leftMargin: root.settingsOpen ? 112 : 32; top: parent.top; topMargin: 24 }
+            text: root.settingsOpen ? "Settings" : "reTasker"
             font.pixelSize: 56
             font.bold: true
             color: "black"
+        }
+
+        Item {
+            id: backBtn
+            width: 56
+            height: 56
+            visible: root.settingsOpen
+            anchors { left: parent.left; leftMargin: 32; verticalCenter: title.verticalCenter }
+            Canvas {
+                anchors.fill: parent
+                onPaint: {
+                    var ctx = getContext("2d");
+                    ctx.reset();
+                    ctx.strokeStyle = "black";
+                    ctx.lineWidth = 7;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    ctx.beginPath();
+                    ctx.moveTo(width * 0.68, height * 0.18);
+                    ctx.lineTo(width * 0.28, height * 0.50);
+                    ctx.lineTo(width * 0.68, height * 0.82);
+                    ctx.stroke();
+                }
+                Component.onCompleted: requestPaint()
+            }
+            MouseArea { anchors.fill: parent; anchors.margins: -24; onClicked: root.settingsOpen = false }
         }
 
         Item {
@@ -277,9 +354,48 @@ Rectangle {
             MouseArea { anchors.fill: parent; anchors.margins: -24; onClicked: root.close() }
         }
 
+        Item {
+            id: settingsBtn
+            width: 56
+            height: 56
+            visible: !root.settingsOpen
+            anchors { right: closeBtn.left; rightMargin: 44; verticalCenter: title.verticalCenter }
+            Canvas {
+                anchors.fill: parent
+                onPaint: {
+                    var ctx = getContext("2d");
+                    ctx.reset();
+                    ctx.strokeStyle = "black";
+                    ctx.lineWidth = 5;
+                    ctx.lineCap = "round";
+                    ctx.lineJoin = "round";
+                    ctx.beginPath();
+                    for (var i = 0; i < 8; i++) {
+                        var a = i * Math.PI / 4;
+                        var x1 = width * 0.50 + Math.cos(a) * width * 0.31;
+                        var y1 = height * 0.50 + Math.sin(a) * height * 0.31;
+                        var x2 = width * 0.50 + Math.cos(a) * width * 0.42;
+                        var y2 = height * 0.50 + Math.sin(a) * height * 0.42;
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                    }
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(width * 0.50, height * 0.50, width * 0.24, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(width * 0.50, height * 0.50, width * 0.09, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                Component.onCompleted: requestPaint()
+            }
+            MouseArea { anchors.fill: parent; anchors.margins: -24; onClicked: root.settingsOpen = true }
+        }
+
         Row {
             anchors { left: parent.left; leftMargin: 32; top: title.bottom; topMargin: 28 }
             spacing: 24
+            visible: !root.settingsOpen
 
             // Primary view switch: flat list vs month calendar.
             Row {
@@ -359,7 +475,7 @@ Rectangle {
         id: monthPane
         anchors { top: header.bottom; left: parent.left; right: parent.right }
         height: (root.height - header.height) * 0.58
-        visible: root.viewMode === "calendar"
+        visible: !root.settingsOpen && root.viewMode === "calendar"
         year: root.shownYear
         month: root.shownMonth
         dayIndex: root.dayIndex
@@ -379,7 +495,7 @@ Rectangle {
         id: listBar
         anchors { top: monthPane.bottom; left: parent.left; right: parent.right }
         height: 72
-        visible: root.viewMode === "calendar"
+        visible: !root.settingsOpen && root.viewMode === "calendar"
         color: "white"
 
         Row {
@@ -448,7 +564,10 @@ Rectangle {
                 anchors.fill: parent
                 onClicked: {
                     var key = root.selectedDay !== "" ? root.selectedDay : root.todayKey;
-                    broker.sendSimpleSignal("retasker.newnote", JSON.stringify({ name: root.dayLabel(key) }));
+                    broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
+                        name: root.dayLabel(key),
+                        template: settings.noteTemplateFilename
+                    }));
                     root.close();
                 }
             }
@@ -470,6 +589,7 @@ Rectangle {
             top: root.viewMode === "calendar" ? listBar.bottom : header.bottom
             left: parent.left; right: parent.right; bottom: parent.bottom
         }
+        visible: !root.settingsOpen
         model: rows
         clip: true
         cacheBuffer: 0
@@ -491,10 +611,78 @@ Rectangle {
 
     Text {
         anchors.centerIn: list
-        visible: rows.count === 0
+        visible: !root.settingsOpen && rows.count === 0
         text: root.filter === "done" && root.viewMode === "list" ? "Nothing done yet" : "No todos"
         font.pixelSize: 40
         color: "black"
+    }
+
+    // --- Settings ---------------------------------------------------------
+    Rectangle {
+        id: settingsPage
+        anchors { top: header.bottom; left: parent.left; right: parent.right; bottom: parent.bottom }
+        visible: root.settingsOpen
+        color: "white"
+
+        Column {
+            anchors { top: parent.top; left: parent.left; right: parent.right }
+
+            Rectangle {
+                width: parent.width
+                height: 150
+                color: "white"
+
+                Column {
+                    anchors { left: parent.left; leftMargin: 32; verticalCenter: parent.verticalCenter }
+                    width: parent.width - 420
+                    spacing: 10
+                    Text {
+                        text: "Default template"
+                        font.pixelSize: 38
+                        font.bold: true
+                        color: "black"
+                    }
+                    Text {
+                        width: parent.width
+                        text: root.templateLabel()
+                        font.pixelSize: 30
+                        color: "black"
+                        elide: Text.ElideRight
+                    }
+                }
+
+                Row {
+                    anchors { right: parent.right; rightMargin: 32; verticalCenter: parent.verticalCenter }
+                    spacing: 20
+
+                    Rectangle {
+                        width: 170
+                        height: 76
+                        color: "white"
+                        border.color: "black"
+                        border.width: 3
+                        Text { anchors.centerIn: parent; text: "Reset"; font.pixelSize: 32; color: "black" }
+                        MouseArea { anchors.fill: parent; onClicked: root.resetDefaultTemplate() }
+                    }
+
+                    Rectangle {
+                        width: 190
+                        height: 76
+                        color: "black"
+                        border.color: "black"
+                        border.width: 3
+                        Text { anchors.centerIn: parent; text: "Choose"; font.pixelSize: 32; color: "white" }
+                        MouseArea { anchors.fill: parent; onClicked: root.chooseDefaultTemplate() }
+                    }
+                }
+
+                Rectangle {
+                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                    height: 2
+                    color: "black"
+                }
+            }
+        }
     }
 
     // --- Delete confirmation ---------------------------------------------
@@ -601,6 +789,11 @@ Rectangle {
         root.shownMonth = now.getMonth();
         root.todayKey = Cal.dateKey(now);
         root.viewMode = settings.viewMode;
+        if (settings.openSettingsOnStart) {
+            root.settingsOpen = true;
+            settings.openSettingsOnStart = false;
+        }
+        loadTemplateConfig();
         loadOcrConfig();
         refresh();
     }
