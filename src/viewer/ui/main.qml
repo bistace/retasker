@@ -495,7 +495,7 @@ Rectangle {
                             onClicked: {
                                 root.viewMode = modelData.key;
                                 settings.viewMode = modelData.key;
-                                root.selectedDay = "";
+                                root.selectedDay = modelData.key === "calendar" ? root.todayKey : "";
                                 root.refresh();
                             }
                         }
@@ -982,6 +982,9 @@ Rectangle {
         root.shownMonth = now.getMonth();
         root.todayKey = Cal.dateKey(now);
         root.viewMode = settings.viewMode;
+        // Calendar view opens scoped to today; the list shows everything.
+        if (root.viewMode === "calendar")
+            root.selectedDay = root.todayKey;
         if (settings.openSettingsOnStart) {
             root.settingsOpen = true;
             settings.openSettingsOnStart = false;
