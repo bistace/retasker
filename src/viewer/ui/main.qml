@@ -39,6 +39,12 @@ Rectangle {
     property string viewMode: "list"        // "list" | "calendar"
     property string selectedDay: ""
     property var dayIndex: ({})
+    // Notes the viewer has created, tracked locally (same as the done-map) so the
+    // calendar can mark days and the sheet can list/reopen them. notesMap holds
+    // the titled extras per day ("y-m-d" -> [titles]); dayNoteMap records whether
+    // a day's main (date-named) note has been created ("y-m-d" -> true).
+    property var notesMap: ({})
+    property var dayNoteMap: ({})
     property int shownYear: 0
     property int shownMonth: 0               // 0-based
     property string todayKey: ""
@@ -54,6 +60,19 @@ Rectangle {
     property string pendingText: ""
     property string pendingUrl: ""
 
+    // Day-notes sheet: addNoteDay is the day it acts on (set when opened);
+    // addSheetMode is "list" (browse/open the day's notes) or "new" (title entry).
+    property bool addNoteOpen: false
+    property string addNoteDay: ""
+    property string addSheetMode: "list"
+
+    // Forget-note confirmation: pendingForgetKind ("day"|"extra") drives the
+    // modal; it acts on addNoteDay (the open sheet's day). title is the extra's
+    // raw title; label is what the modal shows.
+    property string pendingForgetKind: ""
+    property string pendingForgetTitle: ""
+    property string pendingForgetLabel: ""
+
     // OCR (config loaded from appDir/config.json; null disables transcription).
     // ocrTried guards against re-submitting the same capture within a session;
     // reopening the app retries anything still left as an image (e.g. offline).
@@ -64,6 +83,8 @@ Rectangle {
         id: settings
         category: "retasker"
         property string doneJson: "{}"
+        property string notesJson: "{}"     // day -> [titles] of extra notes
+        property string dayNotesJson: "{}"  // day -> true if its main note exists
         property string viewMode: "list"    // remembered across sessions
         property string noteTemplateFilename: ""
         property string noteTemplateName: "Blank"
@@ -95,6 +116,16 @@ Rectangle {
             root.doneMap = JSON.parse(settings.doneJson);
         } catch (e) {
             root.doneMap = {};
+        }
+        try {
+            root.notesMap = JSON.parse(settings.notesJson);
+        } catch (e) {
+            root.notesMap = {};
+        }
+        try {
+            root.dayNoteMap = JSON.parse(settings.dayNotesJson);
+        } catch (e) {
+            root.dayNoteMap = {};
         }
         var entries = Store.collect(folder);
         root.dayIndex = Cal.buildIndex(entries, root.doneMap);
@@ -268,6 +299,123 @@ Rectangle {
             return "";
         var p = key.split("-");
         return Qt.formatDate(new Date(p[0], p[1] - 1, p[2]), "d MMMM yyyy");
+    }
+
+    // Library name for a day's extra note: "<date> — <title>". The date prefix
+    // groups a day's notes together and keeps titles from colliding across days;
+    // both create and reopen go through the same name so the bridge dedupes.
+    function dayNoteName(key, title) {
+        return root.dayLabel(key) + " — " + title;
+    }
+
+    // Open (or create) the day's primary note, named just by its date. Remember
+    // it locally so the calendar and sheet can show that the day has a main note.
+    function openDayNote(key) {
+        var next = {};
+        for (var k in root.dayNoteMap)
+            next[k] = root.dayNoteMap[k];
+        next[key] = true;
+        root.dayNoteMap = next;
+        settings.dayNotesJson = JSON.stringify(next);
+        broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
+            name: root.dayLabel(key),
+            template: settings.noteTemplateFilename
+        }));
+        root.close();
+    }
+
+    // The day's notes as list rows: the main note first (if created), then the
+    // titled extras. kind drives open/remove; title is the extra's raw title.
+    function dayNotes(key) {
+        var out = [];
+        if (root.dayNoteMap[key] === true)
+            out.push({
+                kind: "day",
+                label: root.dayLabel(key),
+                title: ""
+            });
+        var extras = root.notesMap[key] ? root.notesMap[key] : [];
+        for (var i = 0; i < extras.length; i++)
+            out.push({
+                kind: "extra",
+                label: extras[i],
+                title: extras[i]
+            });
+        return out;
+    }
+
+    // Forget a hand-deleted note (drops the local record only; the notebook, if
+    // it still exists, is untouched). Reopening/recreating re-adds it.
+    function forgetDayNote(key) {
+        var next = {};
+        for (var k in root.dayNoteMap)
+            if (k !== key)
+                next[k] = root.dayNoteMap[k];
+        root.dayNoteMap = next;
+        settings.dayNotesJson = JSON.stringify(next);
+    }
+
+    function forgetExtraNote(key, title) {
+        var list = (root.notesMap[key] ? root.notesMap[key] : []).filter(function (t) {
+            return t !== title;
+        });
+        var next = {};
+        for (var k in root.notesMap)
+            next[k] = root.notesMap[k];
+        if (list.length > 0)
+            next[key] = list;
+        else
+            delete next[key];
+        root.notesMap = next;
+        settings.notesJson = JSON.stringify(next);
+    }
+
+    function askForget(kind, title, label) {
+        root.pendingForgetTitle = title;
+        root.pendingForgetLabel = label;
+        root.pendingForgetKind = kind;
+    }
+
+    function confirmForget() {
+        if (root.pendingForgetKind === "day")
+            root.forgetDayNote(root.addNoteDay);
+        else if (root.pendingForgetKind === "extra")
+            root.forgetExtraNote(root.addNoteDay, root.pendingForgetTitle);
+        root.pendingForgetKind = "";
+    }
+
+    // Open an existing extra note for a day (the bridge matches by name).
+    function openExtraNote(key, title) {
+        broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
+            name: root.dayNoteName(key, title),
+            template: settings.noteTemplateFilename
+        }));
+        root.close();
+    }
+
+    // Create a titled note for the day, remember it locally, and open it.
+    function createExtraNote(key, title) {
+        var t = title.trim();
+        if (t === "")
+            return;
+        var list = root.notesMap[key] ? root.notesMap[key].slice() : [];
+        if (list.indexOf(t) === -1)
+            list.push(t);
+        var next = {};
+        for (var k in root.notesMap)
+            next[k] = root.notesMap[k];
+        next[key] = list;
+        root.notesMap = next;
+        settings.notesJson = JSON.stringify(next);
+        broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
+            name: root.dayNoteName(key, t),
+            template: settings.noteTemplateFilename
+        }));
+        root.close();
+    }
+
+    function activeDay() {
+        return root.selectedDay !== "" ? root.selectedDay : root.todayKey;
     }
 
     function templateLabel() {
@@ -571,6 +719,8 @@ Rectangle {
         year: root.shownYear
         month: root.shownMonth
         dayIndex: root.dayIndex
+        notesMap: root.notesMap
+        dayNoteMap: root.dayNoteMap
         todayKey: root.todayKey
         selectedKey: root.selectedDay
         onDayClicked: function (key) {
@@ -651,35 +801,33 @@ Rectangle {
             }
         }
 
-        // Create a real notebook for the selected day (or today), filed in the
-        // "reTasker" collection, and open it. The viewer can't reach xochitl's
-        // controllers, so it asks the native bridge, which hands off to the
-        // MainView handler; closing the viewer drops the user into the new note.
+        // Single entry point to the selected day's notes: opens a sheet listing
+        // the day's notes (tap to open) with actions to add a titled note or open
+        // the day's main note. The sheet's actions go through the native bridge,
+        // which creates/opens the real notebook; closing the viewer drops the
+        // user into it.
         Rectangle {
-            id: newNoteBtn
+            id: notesBtn
             anchors {
                 right: parent.right
                 rightMargin: 32
                 verticalCenter: parent.verticalCenter
             }
-            width: 300
+            width: 240
             height: 60
             color: "black"
             Text {
                 anchors.centerIn: parent
-                text: "+ New note"
-                font.pixelSize: 32
+                text: "Notes"
+                font.pixelSize: 30
                 color: "white"
             }
             MouseArea {
                 anchors.fill: parent
                 onClicked: {
-                    var key = root.selectedDay !== "" ? root.selectedDay : root.todayKey;
-                    broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
-                        name: root.dayLabel(key),
-                        template: settings.noteTemplateFilename
-                    }));
-                    root.close();
+                    root.addNoteDay = root.activeDay();
+                    root.addSheetMode = "list";
+                    root.addNoteOpen = true;
                 }
             }
         }
@@ -970,6 +1118,492 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: root.confirmDelete()
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Day-notes sheet --------------------------------------------------
+    // List mode browses/opens the selected day's notes (its main note plus any
+    // titled extras); new mode takes a title for a new one. Title entry relies on
+    // the device on-screen keyboard appearing when the field gains focus.
+    Rectangle {
+        id: addSheet
+        anchors.fill: parent
+        visible: root.addNoteOpen
+        color: "white"
+
+        // Swallow taps so nothing behind reacts.
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 760
+            height: 820
+            color: "white"
+            border.color: "black"
+            border.width: 4
+
+            Text {
+                id: addTitle
+                anchors {
+                    top: parent.top
+                    topMargin: 40
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 120
+                }
+                text: "Notes for " + root.dayLabel(root.addNoteDay)
+                font.pixelSize: 44
+                font.bold: true
+                color: "black"
+                elide: Text.ElideRight
+            }
+
+            // Dismiss the whole sheet.
+            Item {
+                width: 52
+                height: 52
+                anchors {
+                    top: parent.top
+                    topMargin: 40
+                    right: parent.right
+                    rightMargin: 44
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: parent.width
+                    height: 6
+                    radius: 3
+                    color: "black"
+                    rotation: 45
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: parent.width
+                    height: 6
+                    radius: 3
+                    color: "black"
+                    rotation: -45
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -24
+                    onClicked: root.addNoteOpen = false
+                }
+            }
+
+            // ---- List mode: the day's notes -----------------------------
+            Item {
+                visible: root.addSheetMode === "list"
+                anchors {
+                    top: addTitle.bottom
+                    topMargin: 24
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
+                    bottom: parent.bottom
+                    bottomMargin: 180
+                }
+
+                Text {
+                    id: listHint
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                    }
+                    text: existingList.count > 0 ? "Tap a note to open it" : "No notes for this day yet."
+                    font.pixelSize: 28
+                    color: "black"
+                }
+
+                ListView {
+                    id: existingList
+                    anchors {
+                        top: listHint.bottom
+                        topMargin: 16
+                        left: parent.left
+                        right: parent.right
+                        bottom: parent.bottom
+                    }
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    spacing: 12
+                    model: root.dayNotes(root.addNoteDay)
+                    delegate: Rectangle {
+                        id: noteRow
+                        required property var modelData
+                        width: existingList.width
+                        height: 76
+                        color: "white"
+                        border.color: "black"
+                        border.width: 2
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                leftMargin: 20
+                                right: removeBtn.left
+                                rightMargin: 12
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: noteRow.modelData.label
+                            font.pixelSize: 32
+                            font.bold: noteRow.modelData.kind === "day"
+                            color: "black"
+                            elide: Text.ElideRight
+                        }
+
+                        // Open the note (whole row except the remove button).
+                        MouseArea {
+                            anchors {
+                                left: parent.left
+                                top: parent.top
+                                bottom: parent.bottom
+                                right: removeBtn.left
+                            }
+                            onClicked: {
+                                if (noteRow.modelData.kind === "day")
+                                    root.openDayNote(root.addNoteDay);
+                                else
+                                    root.openExtraNote(root.addNoteDay, noteRow.modelData.title);
+                            }
+                        }
+
+                        // Forget a hand-deleted note (local record only).
+                        Item {
+                            id: removeBtn
+                            width: 76
+                            anchors {
+                                top: parent.top
+                                bottom: parent.bottom
+                                right: parent.right
+                            }
+                            Rectangle {
+                                anchors {
+                                    left: parent.left
+                                    top: parent.top
+                                    topMargin: 14
+                                    bottomMargin: 14
+                                }
+                                width: 2
+                                height: parent.height - 28
+                                color: "black"
+                            }
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 30
+                                height: 5
+                                radius: 2
+                                color: "black"
+                                rotation: 45
+                            }
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 30
+                                height: 5
+                                radius: 2
+                                color: "black"
+                                rotation: -45
+                            }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (noteRow.modelData.kind === "day")
+                                        root.askForget("day", "", noteRow.modelData.label);
+                                    else
+                                        root.askForget("extra", noteRow.modelData.title, noteRow.modelData.label);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // List-mode actions: start a new titled note, or open the day's main note.
+            Row {
+                visible: root.addSheetMode === "list"
+                anchors {
+                    bottom: parent.bottom
+                    bottomMargin: 40
+                    horizontalCenter: parent.horizontalCenter
+                }
+                spacing: 40
+
+                Rectangle {
+                    width: 300
+                    height: 100
+                    color: "white"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "+ New note"
+                        font.pixelSize: 38
+                        color: "black"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            root.addSheetMode = "new";
+                            titleField.text = "";
+                            titleField.forceActiveFocus();
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: 300
+                    height: 100
+                    color: "black"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.addNoteDay === root.todayKey ? "Today's note" : "Day's note"
+                        font.pixelSize: 38
+                        color: "white"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.openDayNote(root.addNoteDay)
+                    }
+                }
+            }
+
+            // ---- New mode: title entry ----------------------------------
+            Item {
+                visible: root.addSheetMode === "new"
+                anchors {
+                    top: addTitle.bottom
+                    topMargin: 24
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
+                    bottom: parent.bottom
+                    bottomMargin: 180
+                }
+
+                Text {
+                    id: inputLabel
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                    }
+                    text: "New note title"
+                    font.pixelSize: 28
+                    color: "black"
+                }
+
+                Rectangle {
+                    id: inputBox
+                    anchors {
+                        top: inputLabel.bottom
+                        topMargin: 16
+                        left: parent.left
+                        right: parent.right
+                    }
+                    height: 92
+                    color: "white"
+                    border.color: "black"
+                    border.width: 3
+
+                    TextInput {
+                        id: titleField
+                        anchors {
+                            fill: parent
+                            leftMargin: 20
+                            rightMargin: 20
+                        }
+                        font.pixelSize: 38
+                        color: "black"
+                        clip: true
+                        verticalAlignment: TextInput.AlignVCenter
+                        onAccepted: root.createExtraNote(root.addNoteDay, titleField.text)
+                    }
+
+                    Text {
+                        anchors {
+                            left: parent.left
+                            leftMargin: 20
+                            verticalCenter: parent.verticalCenter
+                        }
+                        visible: titleField.text === ""
+                        text: "e.g. Standup, 1:1 with Alex"
+                        font.pixelSize: 38
+                        color: "#888888"
+                    }
+                }
+            }
+
+            // New-mode actions: back to the list, or create the titled note.
+            Row {
+                visible: root.addSheetMode === "new"
+                anchors {
+                    bottom: parent.bottom
+                    bottomMargin: 40
+                    horizontalCenter: parent.horizontalCenter
+                }
+                spacing: 40
+
+                Rectangle {
+                    width: 260
+                    height: 100
+                    color: "white"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Back"
+                        font.pixelSize: 40
+                        color: "black"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.addSheetMode = "list"
+                    }
+                }
+
+                Rectangle {
+                    readonly property bool ready: titleField.text.trim() !== ""
+                    width: 260
+                    height: 100
+                    color: ready ? "black" : "white"
+                    border.color: ready ? "black" : "#aaaaaa"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Create"
+                        font.pixelSize: 40
+                        color: parent.ready ? "white" : "#aaaaaa"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: titleField.text.trim() !== ""
+                        onClicked: root.createExtraNote(root.addNoteDay, titleField.text)
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Forget-note confirmation ----------------------------------------
+    // Removing a row only drops reTasker's local record; the notebook (if it
+    // still exists) is untouched. Stacks above the day-notes sheet.
+    Rectangle {
+        id: forgetConfirm
+        anchors.fill: parent
+        visible: root.pendingForgetKind !== ""
+        color: "white"
+
+        // Swallow taps so nothing behind the modal reacts.
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 720
+            height: 520
+            color: "white"
+            border.color: "black"
+            border.width: 4
+
+            Text {
+                id: forgetTitle
+                anchors {
+                    top: parent.top
+                    topMargin: 48
+                    horizontalCenter: parent.horizontalCenter
+                }
+                text: "Remove from list?"
+                font.pixelSize: 46
+                font.bold: true
+                color: "black"
+            }
+
+            Text {
+                id: forgetName
+                anchors {
+                    top: forgetTitle.bottom
+                    topMargin: 36
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
+                }
+                text: root.pendingForgetLabel
+                font.pixelSize: 40
+                color: "black"
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                maximumLineCount: 2
+                elide: Text.ElideRight
+            }
+
+            Text {
+                anchors {
+                    top: forgetName.bottom
+                    topMargin: 28
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
+                }
+                text: "This only removes it from reTasker. The notebook itself is not deleted."
+                font.pixelSize: 28
+                color: "black"
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+            }
+
+            Row {
+                anchors {
+                    bottom: parent.bottom
+                    bottomMargin: 48
+                    horizontalCenter: parent.horizontalCenter
+                }
+                spacing: 40
+
+                Rectangle {
+                    width: 260
+                    height: 100
+                    color: "white"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Cancel"
+                        font.pixelSize: 40
+                        color: "black"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.pendingForgetKind = ""
+                    }
+                }
+
+                Rectangle {
+                    width: 260
+                    height: 100
+                    color: "black"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Remove"
+                        font.pixelSize: 40
+                        color: "white"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.confirmForget()
                     }
                 }
             }

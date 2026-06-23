@@ -10,6 +10,8 @@ Item {
     property int year
     property int month                  // 0-based, matches JS Date
     property var dayIndex: ({})
+    property var notesMap: ({})         // day key -> [titles] of extra notes
+    property var dayNoteMap: ({})       // day key -> true if its main note exists
     property string todayKey
     property string selectedKey
 
@@ -138,6 +140,8 @@ Item {
                 readonly property bool allDone: total > 0 && done === total
                 readonly property bool isToday: modelData && modelData.key === monthView.todayKey
                 readonly property bool isSelected: modelData && modelData.key === monthView.selectedKey
+                readonly property int noteCount: modelData && monthView.notesMap[modelData.key] ? monthView.notesMap[modelData.key].length : 0
+                readonly property bool hasDayNote: modelData && monthView.dayNoteMap[modelData.key] === true
 
                 Rectangle {
                     anchors.fill: parent
@@ -158,6 +162,36 @@ Item {
                         font.pixelSize: 30
                         font.bold: cell.isToday
                         color: "black"
+                    }
+
+                    // Note markers in the top-right corner: an outline dot when the
+                    // day's main note exists, a filled dot when it has titled notes.
+                    Row {
+                        anchors {
+                            top: parent.top
+                            right: parent.right
+                            topMargin: 12
+                            rightMargin: 14
+                        }
+                        spacing: 6
+                        layoutDirection: Qt.RightToLeft
+
+                        Rectangle {
+                            width: 20
+                            height: 20
+                            radius: 10
+                            visible: cell.noteCount > 0
+                            color: "black"
+                        }
+                        Rectangle {
+                            width: 20
+                            height: 20
+                            radius: 10
+                            visible: cell.hasDayNote
+                            color: "white"
+                            border.color: "black"
+                            border.width: 3
+                        }
                     }
 
                     // Status marker: filled+check when all done, open ring when pending.
