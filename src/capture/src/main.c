@@ -27,21 +27,23 @@
 // writes here and delete removes from here — one shared source of truth.
 #define CAPTURE_DIR "/home/root/xovi/exthome/appload/retasker/captures"
 #define TEMPLATE_CONFIG "/home/root/xovi/exthome/appload/retasker/template.json"
-#define FB_TYPE_RGBA 2  // FBSPY_TYPE_RGBA from framebuffer-spy.h (32-bit pixels)
+#define FB_TYPE_RGBA 2 // FBSPY_TYPE_RGBA from framebuffer-spy.h (32-bit pixels)
 
 struct fb_config {
     uintptr_t addr;
     int width, height, type, bpl;
 };
 
-struct rect { int x, y, w, h; };
+struct rect {
+    int x, y, w, h;
+};
 
 // Parses framebuffer-spy's "0xADDR,width,height,type,bpl,requiresReload" string.
 static int parse_fb_config(const char *s, struct fb_config *c) {
     if (s == NULL) return -1;
     int reload;
-    int n = sscanf(s, "%p,%d,%d,%d,%d,%d", (void **)&c->addr,
-                   &c->width, &c->height, &c->type, &c->bpl, &reload);
+    int n = sscanf(s, "%p,%d,%d,%d,%d,%d", (void **)&c->addr, &c->width, &c->height, &c->type,
+                   &c->bpl, &reload);
     return (n == 6 && c->addr != 0) ? 0 : -1;
 }
 
@@ -50,23 +52,24 @@ static long json_int(const char *json, const char *key) {
     const char *p = strstr(json, key);
     if (p == NULL) return -1;
     p += strlen(key);
-    while (*p && *p != '-' && !isdigit((unsigned char)*p)) p++;
+    while (*p && *p != '-' && !isdigit((unsigned char)*p))
+        p++;
     if (*p == '\0') return -1;
     return strtol(p, NULL, 10);
 }
 
 static int parse_bbox(const char *json, struct rect *r) {
     if (json == NULL) return -1;
-    r->x = (int) json_int(json, "\"x\"");
-    r->y = (int) json_int(json, "\"y\"");
-    r->w = (int) json_int(json, "\"width\"");
-    r->h = (int) json_int(json, "\"height\"");
+    r->x = (int)json_int(json, "\"x\"");
+    r->y = (int)json_int(json, "\"y\"");
+    r->w = (int)json_int(json, "\"width\"");
+    r->h = (int)json_int(json, "\"height\"");
     if (r->x < 0 || r->y < 0 || r->w <= 0 || r->h <= 0) return -1;
     return 0;
 }
 
 static void clamp_rect(struct rect *r, const struct fb_config *c) {
-    if (r->x + r->w > c->width)  r->w = c->width  - r->x;
+    if (r->x + r->w > c->width) r->w = c->width - r->x;
     if (r->y + r->h > c->height) r->h = c->height - r->y;
 }
 
@@ -74,16 +77,16 @@ static void clamp_rect(struct rect *r, const struct fb_config *c) {
 // Qt's Format_ARGB32 is stored little-endian as B,G,R,A in memory; alpha dropped.
 static uint8_t *crop_rgb(const struct fb_config *c, const struct rect *r) {
     const int bpp = 4;
-    uint8_t *out = malloc((size_t) r->w * r->h * 3);
+    uint8_t *out = malloc((size_t)r->w * r->h * 3);
     if (out == NULL) return NULL;
-    const uint8_t *base = (const uint8_t *) c->addr;
+    const uint8_t *base = (const uint8_t *)c->addr;
     for (int row = 0; row < r->h; row++) {
-        const uint8_t *src = base + (size_t)(r->y + row) * c->bpl + (size_t) r->x * bpp;
-        uint8_t *dst = out + (size_t) row * r->w * 3;
+        const uint8_t *src = base + (size_t)(r->y + row) * c->bpl + (size_t)r->x * bpp;
+        uint8_t *dst = out + (size_t)row * r->w * 3;
         for (int col = 0; col < r->w; col++, src += bpp, dst += 3) {
-            dst[0] = src[2];  // R
-            dst[1] = src[1];  // G
-            dst[2] = src[0];  // B
+            dst[0] = src[2]; // R
+            dst[1] = src[1]; // G
+            dst[2] = src[0]; // B
         }
     }
     return out;
@@ -94,7 +97,7 @@ static char *write_png(const uint8_t *rgb, const struct rect *r) {
     mkdir(CAPTURE_DIR, 0755);
     char *path = malloc(256);
     if (path == NULL) return NULL;
-    snprintf(path, 256, "%s/cap-%ld-%d.png", CAPTURE_DIR, (long) time(NULL), counter++);
+    snprintf(path, 256, "%s/cap-%ld-%d.png", CAPTURE_DIR, (long)time(NULL), counter++);
     if (!stbi_write_png(path, r->w, r->h, 3, rgb, r->w * 3)) {
         fprintf(stderr, "[retasker] PNG write failed: %s\n", path);
         free(path);
@@ -114,7 +117,7 @@ char *captureHandler(const char *value) {
         return NULL;
     }
 
-    char *cfg = (char *)(uintptr_t) framebuffer_spy$getConfigString();
+    char *cfg = (char *)(uintptr_t)framebuffer_spy$getConfigString();
     struct fb_config c;
     int ok = parse_fb_config(cfg, &c);
     free(cfg);
@@ -165,9 +168,9 @@ static int hexval(char c) {
 static size_t percent_decode(const char *src, char *dst) {
     size_t j = 0;
     for (size_t i = 0; src[i] != '\0'; i++) {
-        if (src[i] == '%' && isxdigit((unsigned char) src[i + 1])
-                          && isxdigit((unsigned char) src[i + 2])) {
-            dst[j++] = (char) ((hexval(src[i + 1]) << 4) | hexval(src[i + 2]));
+        if (src[i] == '%' && isxdigit((unsigned char)src[i + 1]) &&
+            isxdigit((unsigned char)src[i + 2])) {
+            dst[j++] = (char)((hexval(src[i + 1]) << 4) | hexval(src[i + 2]));
             i += 2;
         } else {
             dst[j++] = src[i];
@@ -207,7 +210,7 @@ char *transcribeHandler(const char *value) {
 
     char png_path[256], txt_path[256];
     snprintf(png_path, sizeof(png_path), "%s/%s", CAPTURE_DIR, name);
-    name[name_len - 4] = '\0';  // strip ".png" to derive the base
+    name[name_len - 4] = '\0'; // strip ".png" to derive the base
     snprintf(txt_path, sizeof(txt_path), "%s/%s.txt", CAPTURE_DIR, name);
 
     int ok = (write_text(txt_path, text, text_len) == 0);
@@ -230,7 +233,8 @@ static int json_str(const char *json, const char *key, char *out, size_t outsize
     p = strchr(p + strlen(pat), ':');
     if (p == NULL) return 0;
     p++;
-    while (*p == ' ' || *p == '\t') p++;
+    while (*p == ' ' || *p == '\t')
+        p++;
     if (*p != '"') return 0;
     p++;
     size_t i = 0;
@@ -245,23 +249,37 @@ static int json_str(const char *json, const char *key, char *out, size_t outsize
 static int json_escape(const char *src, char *out, size_t outsize) {
     size_t j = 0;
     for (size_t i = 0; src[i] != '\0'; i++) {
-        unsigned char c = (unsigned char) src[i];
+        unsigned char c = (unsigned char)src[i];
         const char *esc = NULL;
         char hex[7];
         switch (c) {
-            case '"': esc = "\\\""; break;
-            case '\\': esc = "\\\\"; break;
-            case '\b': esc = "\\b"; break;
-            case '\f': esc = "\\f"; break;
-            case '\n': esc = "\\n"; break;
-            case '\r': esc = "\\r"; break;
-            case '\t': esc = "\\t"; break;
-            default:
-                if (c < 0x20) {
-                    snprintf(hex, sizeof(hex), "\\u%04x", c);
-                    esc = hex;
-                }
-                break;
+        case '"':
+            esc = "\\\"";
+            break;
+        case '\\':
+            esc = "\\\\";
+            break;
+        case '\b':
+            esc = "\\b";
+            break;
+        case '\f':
+            esc = "\\f";
+            break;
+        case '\n':
+            esc = "\\n";
+            break;
+        case '\r':
+            esc = "\\r";
+            break;
+        case '\t':
+            esc = "\\t";
+            break;
+        default:
+            if (c < 0x20) {
+                snprintf(hex, sizeof(hex), "\\u%04x", c);
+                esc = hex;
+            }
+            break;
         }
         if (esc != NULL) {
             size_t n = strlen(esc);
@@ -270,7 +288,7 @@ static int json_escape(const char *src, char *out, size_t outsize) {
             j += n;
         } else {
             if (j + 2 > outsize) return -1;
-            out[j++] = (char) c;
+            out[j++] = (char)c;
         }
     }
     out[j] = '\0';
@@ -285,7 +303,8 @@ static int json_bool(const char *json, const char *key) {
     p = strchr(p + strlen(pat), ':');
     if (p == NULL) return 0;
     p++;
-    while (*p == ' ' || *p == '\t') p++;
+    while (*p == ' ' || *p == '\t')
+        p++;
     return strncmp(p, "true", 4) == 0;
 }
 
@@ -295,7 +314,7 @@ static int read_file(const char *path, char *buf, size_t bufsize) {
     size_t n = fread(buf, 1, bufsize - 1, f);
     fclose(f);
     buf[n] = '\0';
-    return (int) n;
+    return (int)n;
 }
 
 static int has_metadata_suffix(const char *name) {
@@ -305,9 +324,8 @@ static int has_metadata_suffix(const char *name) {
 
 // Reads a metadata file and, if it matches type/visibleName (and parent when
 // given), copies its UUID (filename minus ".metadata") into uuid. Skips deleted.
-static int match_entry(const char *fname, const char *wantType,
-                       const char *wantName, const char *wantParent,
-                       char *uuid, size_t uuidSize) {
+static int match_entry(const char *fname, const char *wantType, const char *wantName,
+                       const char *wantParent, char *uuid, size_t uuidSize) {
     char path[512], buf[8192], type[32], vn[256], parent[64];
     snprintf(path, sizeof(path), "%s/%s", XOCHITL_DIR, fname);
     if (read_file(path, buf, sizeof(buf)) < 0) return 0;
@@ -348,14 +366,16 @@ char *newNoteHandler(const char *value) {
         struct dirent *e;
         while ((e = readdir(d)) != NULL) {
             if (!has_metadata_suffix(e->d_name)) continue;
-            if (match_entry(e->d_name, "CollectionType", "reTasker", NULL, folderId, sizeof(folderId)))
+            if (match_entry(e->d_name, "CollectionType", "reTasker", NULL, folderId,
+                            sizeof(folderId)))
                 break;
         }
         if (folderId[0] != '\0') {
             rewinddir(d);
             while ((e = readdir(d)) != NULL) {
                 if (!has_metadata_suffix(e->d_name)) continue;
-                if (match_entry(e->d_name, "DocumentType", name, folderId, existing, sizeof(existing)))
+                if (match_entry(e->d_name, "DocumentType", name, folderId, existing,
+                                sizeof(existing)))
                     break;
             }
         }
@@ -379,10 +399,11 @@ char *newNoteHandler(const char *value) {
 
     char out[4096];
     int n = snprintf(out, sizeof(out),
-                     "uretasker.newnote:{\"name\":\"%s\",\"folder\":\"%s\",\"existing\":\"%s\",\"template\":\"%s\"}\n",
+                     "uretasker.newnote:{\"name\":\"%s\",\"folder\":\"%s\",\"existing\":\"%s\","
+                     "\"template\":\"%s\"}\n",
                      encName, encFolder, encExisting, encTemplate);
-    if (n > 0 && n < (int) sizeof(out)) {
-        if (write(fd, out, (size_t) n) < 0)
+    if (n > 0 && n < (int)sizeof(out)) {
+        if (write(fd, out, (size_t)n) < 0)
             fprintf(stderr, "[retasker] newnote: pipe write failed\n");
     }
     close(fd);
@@ -406,9 +427,10 @@ char *chooseTemplateHandler(const char *value) {
         return NULL;
     }
     char out[2048];
-    int n = snprintf(out, sizeof(out), "uretasker.chooseTemplate:{\"template\":\"%s\"}\n", encTemplate);
-    if (n > 0 && n < (int) sizeof(out)) {
-        if (write(fd, out, (size_t) n) < 0)
+    int n =
+        snprintf(out, sizeof(out), "uretasker.chooseTemplate:{\"template\":\"%s\"}\n", encTemplate);
+    if (n > 0 && n < (int)sizeof(out)) {
+        if (write(fd, out, (size_t)n) < 0)
             fprintf(stderr, "[retasker] chooseTemplate: pipe write failed\n");
     }
     close(fd);
@@ -438,8 +460,8 @@ char *templateHandler(const char *value) {
         fprintf(stderr, "[retasker] template: cannot open %s\n", TEMPLATE_CONFIG);
         return NULL;
     }
-    fprintf(f, "{\"filename\":\"%s\",\"name\":\"%s\",\"landscape\":%s}\n",
-            encFilename, encName, landscape ? "true" : "false");
+    fprintf(f, "{\"filename\":\"%s\",\"name\":\"%s\",\"landscape\":%s}\n", encFilename, encName,
+            landscape ? "true" : "false");
     fclose(f);
     fprintf(stderr, "[retasker] saved template filename='%s' name='%s'\n", filename, name);
     return NULL;
