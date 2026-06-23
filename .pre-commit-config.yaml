@@ -1,0 +1,52 @@
+# Lint + format hooks for reTasker. Run `pre-commit install` once to enable them
+# on `git commit`; run `pre-commit run --all-files` to sweep the whole tree.
+#
+# Language tools are `language: system` hooks so they use the brew-installed
+# binaries (clang-format, shfmt, shellcheck, qmlformat, qmllint from Qt6).
+# Install them with: brew install pre-commit shfmt shellcheck qt
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^src/capture/vendor/
+      - id: end-of-file-fixer
+        exclude: ^src/capture/vendor/
+      - id: mixed-line-ending
+        exclude: ^src/capture/vendor/
+      - id: check-merge-conflict
+      - id: check-json
+
+  - repo: local
+    hooks:
+      # C — capture extension. Vendored stb header is left untouched.
+      - id: clang-format
+        name: clang-format (C)
+        entry: clang-format -i
+        language: system
+        files: ^src/capture/src/.*\.c$
+
+      # Shell — build scripts.
+      - id: shfmt
+        name: shfmt (shell)
+        entry: shfmt -w -i 4 -ci
+        language: system
+        types: [shell]
+      - id: shellcheck
+        name: shellcheck (shell)
+        entry: shellcheck
+        language: system
+        types: [shell]
+
+      # QML — viewer UI. qmlformat rewrites; qmllint passes on warnings and
+      # only fails the commit on real errors (syntax / unresolved types).
+      - id: qmlformat
+        name: qmlformat (QML)
+        entry: qmlformat -i
+        language: system
+        files: \.qml$
+      - id: qmllint
+        name: qmllint (QML)
+        entry: qmllint
+        language: system
+        files: \.qml$

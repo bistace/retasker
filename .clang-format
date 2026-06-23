@@ -1,0 +1,10 @@
+# C formatting for the capture extension (src/capture/src/main.c).
+# The vendored stb_image_write.h is excluded via .pre-commit-config.yaml.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 100
+PointerAlignment: Right
+AllowShortFunctionsOnASingleLine: Empty
+# Keep the author's single-line early-return guards and hand-grouped includes.
+AllowShortIfStatementsOnASingleLine: WithoutElse
+SortIncludes: false
