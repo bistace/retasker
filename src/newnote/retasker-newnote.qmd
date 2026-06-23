@@ -7,25 +7,93 @@
 ; retasker-capture.so does the filesystem lookups (the "reTasker" folder, and any
 ; existing note with the same name) and forwards here over the broker pipe.
 ;
-; Payload is JSON: {"name":"<title>","folder":"<uuid|empty>","existing":"<uuid|empty>"}.
+; New-note payload is JSON:
+; {"name":"<title>","folder":"<uuid|empty>","existing":"<uuid|empty>","template":"<filename|empty>"}.
 ; If a note for that day already exists we just open it; otherwise we create one
 ; in the reTasker collection (creating the collection if the bridge found none)
 ; and open it -- using xochitl's own path, so no restart and correct on-disk format.
+; The retasker.chooseTemplate signal opens xochitl's native template picker and
+; asks the native bridge to persist the selected template for the AppLoad viewer.
 ;
 ; Plaintext identifiers resolve via the qt-resource-rebuilder hashtab, same as
 ; the other reTasker qmds.
 
 AFFECT /qml/device/view/main/MainView.qml
     IMPORT net.asivery.XoviMessageBroker 2.0
+    IMPORT net.asivery.AppLoad 1.0
 
     TRAVERSE ?#root
         LOCATE AFTER ALL
         INSERT {
             XoviMessageBroker {
                 id: retaskerNoteBroker
-                listeningFor: ["retasker.newnote"]
+                listeningFor: ["retasker.newnote", "retasker.chooseTemplate"]
+
+                function templateLabel(template) {
+                    if (!template)
+                        return "Blank";
+                    if (template.name)
+                        return template.name;
+                    if (template.title)
+                        return template.title;
+                    return template.filename ? template.filename : "Blank";
+                }
+
+                function findTemplate(filename) {
+                    var wanted = filename ? filename : "Blank";
+                    return Templates.list().find(function (t) { return t.filename === wanted; }) || null;
+                }
+
+                function reopenRetasker() {
+                    Qt.callLater(function () {
+                        AppLoadLauncher.launchApplication("retasker", [], ({}), false);
+                    });
+                }
+
+                function saveTemplate(template) {
+                    retaskerNoteBroker.sendSimpleSignal("retasker.template", JSON.stringify({
+                        filename: template && template.filename ? template.filename : "",
+                        name: templateLabel(template),
+                        landscape: template && template.landscape === true
+                    }));
+                }
+
+                function chooseTemplate(message) {
+                    var req = {};
+                    try { req = JSON.parse(message); } catch (e) { req = {}; }
+                    var currentTemplate = findTemplate(req.template);
+                    root.windowNavigator.open("document/window/template-selector", {
+                        currentTemplate: currentTemplate,
+                        onApplied: function (aTemplate, templateApplied, setRecent) {
+                            if (templateApplied && aTemplate) {
+                                saveTemplate(aTemplate);
+                                if (setRecent)
+                                    Templates.setRecentTemplate(aTemplate);
+                            }
+                            reopenRetasker();
+                        },
+                        onRejected: function () {
+                            reopenRetasker();
+                        }
+                    });
+                }
+
+                function applyPreferredTemplate(doc, filename) {
+                    var template = findTemplate(filename);
+                    if (!template)
+                        return false;
+                    var page = doc.lastOpenedPage !== undefined ? doc.lastOpenedPage : 0;
+                    DocumentController.setTemplateForPage(doc, page, template.filename);
+                    LibraryController.setOrientation(doc.id, template.landscape ? Qt.Horizontal : Qt.Vertical);
+                    return true;
+                }
 
                 function onSignalReceived(sgn, message) {
+                    if (sgn === "retasker.chooseTemplate") {
+                        chooseTemplate(message);
+                        return "";
+                    }
+
                     var req = {};
                     try { req = JSON.parse(message); } catch (e) { req = {}; }
                     var name = req.name ? req.name : "reTasker note";
@@ -45,7 +113,8 @@ AFFECT /qml/device/view/main/MainView.qml
                     var id = LibraryController.createDocument(folderId, name);
                     var doc = Library.entryForId(id);
                     if (!doc) { print("[retasker-newnote] entryForId NULL for id=" + id); return "" + id; }
-                    LibraryController.setOrientation(doc.id, Qt.Vertical);
+                    if (!applyPreferredTemplate(doc, req.template))
+                        LibraryController.setOrientation(doc.id, Qt.Vertical);
                     root.explorer.open(doc.id);
                     print("[retasker-newnote] created+opened " + doc.id + " in folder " + folderId + " name='" + name + "'");
                     return "" + id;
