@@ -28,3 +28,15 @@ with
     xovi-message-broker$simpleSignal = "retasker.newnote"
     xovi-message-broker$version = 1
 end
+
+export chooseTemplateHandler
+with
+    xovi-message-broker$simpleSignal = "retasker.chooseTemplate"
+    xovi-message-broker$version = 1
+end
+
+export templateHandler
+with
+    xovi-message-broker$simpleSignal = "retasker.template"
+    xovi-message-broker$version = 1
+end
