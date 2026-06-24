@@ -47,6 +47,14 @@ static int parse_fb_config(const char *s, struct fb_config *c) {
     return (n == 6 && c->addr != 0) ? 0 : -1;
 }
 
+// JSON payload contract for the scrapers below (json_int, parse_bbox, json_str,
+// json_bool): all incoming payloads are FLAT, single-level objects produced by
+// first-party code (the selection .qmd and the QML viewer). Values are only
+// strings, integers or booleans — no nesting, no arrays, no duplicated keys.
+// Each scraper finds its key by substring search and reads the value right after,
+// so these assumptions must hold; if a payload ever needs nesting or arrays,
+// replace these with a real single-header JSON parser rather than extending them.
+
 // Pulls the integer value following a quoted JSON key (e.g. "\"width\"").
 static long json_int(const char *json, const char *key) {
     const char *p = strstr(json, key);
