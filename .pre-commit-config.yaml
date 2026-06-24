@@ -9,22 +9,22 @@ repos:
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
-        exclude: ^src/capture/vendor/
+        exclude: ^src/(capture|backend)/vendor/
       - id: end-of-file-fixer
-        exclude: ^src/capture/vendor/
+        exclude: ^src/(capture|backend)/vendor/
       - id: mixed-line-ending
-        exclude: ^src/capture/vendor/
+        exclude: ^src/(capture|backend)/vendor/
       - id: check-merge-conflict
       - id: check-json
 
   - repo: local
     hooks:
-      # C — capture extension. Vendored stb header is left untouched.
+      # C — capture extension and backend. Vendored headers are left untouched.
       - id: clang-format
         name: clang-format (C)
         entry: clang-format -i
         language: system
-        files: ^src/capture/src/.*\.c$
+        files: ^src/(capture|backend)/src/.*\.c$
 
       # Shell — build scripts.
       - id: shfmt
