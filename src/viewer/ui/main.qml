@@ -561,9 +561,7 @@ Rectangle {
     // Open (or create) the day's primary note, named just by its date. Remember
     // it locally so the calendar and sheet can show that the day has a main note.
     function openDayNote(key) {
-        var next = {};
-        for (var k in root.dayNoteMap)
-            next[k] = root.dayNoteMap[k];
+        var next = Object.assign({}, root.dayNoteMap);
         next[key] = true;
         root.dayNoteMap = next;
         settings.dayNotesJson = JSON.stringify(next);
@@ -597,10 +595,8 @@ Rectangle {
     // Forget a hand-deleted note (drops the local record only; the notebook, if
     // it still exists, is untouched). Reopening/recreating re-adds it.
     function forgetDayNote(key) {
-        var next = {};
-        for (var k in root.dayNoteMap)
-            if (k !== key)
-                next[k] = root.dayNoteMap[k];
+        var next = Object.assign({}, root.dayNoteMap);
+        delete next[key];
         root.dayNoteMap = next;
         settings.dayNotesJson = JSON.stringify(next);
     }
@@ -609,9 +605,7 @@ Rectangle {
         var list = (root.notesMap[key] ? root.notesMap[key] : []).filter(function (t) {
             return t !== title;
         });
-        var next = {};
-        for (var k in root.notesMap)
-            next[k] = root.notesMap[k];
+        var next = Object.assign({}, root.notesMap);
         if (list.length > 0)
             next[key] = list;
         else
@@ -651,9 +645,7 @@ Rectangle {
         var list = root.notesMap[key] ? root.notesMap[key].slice() : [];
         if (list.indexOf(t) === -1)
             list.push(t);
-        var next = {};
-        for (var k in root.notesMap)
-            next[k] = root.notesMap[k];
+        var next = Object.assign({}, root.notesMap);
         next[key] = list;
         root.notesMap = next;
         settings.notesJson = JSON.stringify(next);
