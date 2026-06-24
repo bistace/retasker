@@ -250,7 +250,12 @@ Rectangle {
             root.refresh();
             return;
         }
-        var data = JSON.parse(contents);
+        var data;
+        try {
+            data = JSON.parse(contents);
+        } catch (e) {
+            return;  // malformed reply: drop it, matching the other parses
+        }
         if (type === root.msgRows) {
             if (data.offset === 0)
                 rows.clear();
