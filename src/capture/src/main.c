@@ -128,19 +128,22 @@ static uint8_t *rotate_rgb(const uint8_t *src, int *w, int *h, int rot) {
 
 static char *write_png(const uint8_t *rgb, const struct rect *r) {
     static int counter = 0;
+    // The returned path is handed straight back to xovi-message-broker, which
+    // treats the handler result as a borrowed string (it does not free it). A
+    // heap allocation here would leak per capture, so use a static buffer: the
+    // broker marshals the string to its JS caller synchronously, before the next
+    // capture can overwrite it.
+    static char path[256];
     mkdir(CAPTURE_DIR, 0755);
-    char *path = malloc(256);
-    if (path == NULL) return NULL;
     // Millisecond timestamp (not seconds): the counter resets to 0 when the
     // module reloads, so a second-resolution name could collide with a capture
     // from a previous load and silently overwrite that todo.
     struct timespec now;
     clock_gettime(CLOCK_REALTIME, &now);
     long long ms = (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000;
-    snprintf(path, 256, "%s/cap-%lld-%d.png", CAPTURE_DIR, ms, counter++);
+    snprintf(path, sizeof(path), "%s/cap-%lld-%d.png", CAPTURE_DIR, ms, counter++);
     if (!stbi_write_png(path, r->w, r->h, 3, rgb, r->w * 3)) {
         fprintf(stderr, "[retasker] PNG write failed: %s\n", path);
-        free(path);
         return NULL;
     }
     fprintf(stderr, "[retasker] wrote %s (%dx%d)\n", path, r->w, r->h);
