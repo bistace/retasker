@@ -24,6 +24,8 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "../vendor/stb_image_write.h"
 
+#include "rotate.h"
+
 // The viewer (AppLoad app) treats this folder as the todo list, so capture
 // writes here and delete removes from here — one shared source of truth.
 #define CAPTURE_DIR "/home/root/xovi/exthome/appload/retasker/captures"
@@ -97,32 +99,6 @@ static uint8_t *crop_rgb(const struct fb_config *c, const struct rect *r) {
             dst[2] = src[0]; // B
         }
     }
-    return out;
-}
-
-// Rotates a tight RGB buffer clockwise by rot degrees (90/180/270) into a fresh
-// buffer; the caller frees the source. For 90/270 the width and height swap, so
-// *w/*h are updated to the rotated dimensions. Used to undo xochitl's landscape
-// canvas rotation, which otherwise leaves the crop turned 90 degrees.
-static uint8_t *rotate_rgb(const uint8_t *src, int *w, int *h, int rot) {
-    const int W = *w, H = *h;
-    const int ow = (rot == 180) ? W : H;
-    const int oh = (rot == 180) ? H : W;
-    uint8_t *out = malloc((size_t)ow * oh * 3);
-    if (out == NULL) return NULL;
-    for (int sy = 0; sy < H; sy++) {
-        for (int sx = 0; sx < W; sx++) {
-            int dx = rot == 90 ? H - 1 - sy : rot == 270 ? sy : W - 1 - sx;
-            int dy = rot == 90 ? sx : rot == 270 ? W - 1 - sx : H - 1 - sy;
-            const uint8_t *s = src + ((size_t)sy * W + sx) * 3;
-            uint8_t *d = out + ((size_t)dy * ow + dx) * 3;
-            d[0] = s[0];
-            d[1] = s[1];
-            d[2] = s[2];
-        }
-    }
-    *w = ow;
-    *h = oh;
     return out;
 }
 

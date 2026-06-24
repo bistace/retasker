@@ -11,7 +11,7 @@ $(name) : $(objects)
 xovi.c xovi.h	&: $(xovifile).xovi
 	python3 ${XOVI_REPO}/util/xovigen.py -o xovi.c -H xovi.h -a $(OECORE_TARGET_ARCH) $(xovifile).xovi
 
-main.o	: xovi.h src/main.c vendor/stb_image_write.h
+main.o	: xovi.h src/main.c src/rotate.h vendor/stb_image_write.h
 bridge.o	: src/bridge.c
 
 .PHONY  : clean
