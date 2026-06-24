@@ -416,15 +416,21 @@ Rectangle {
             root.refresh();
     }
 
-    function askDelete(name) {
+    // Find a loaded list row by its filename, or null if it's no longer present.
+    function rowByName(name) {
         for (var i = 0; i < rows.count; i++) {
-            var r = rows.get(i);
-            if (r.name === name) {
-                root.pendingKind = r.kind;
-                root.pendingText = r.text;
-                root.pendingUrl = r.url;
-                break;
-            }
+            if (rows.get(i).name === name)
+                return rows.get(i);
+        }
+        return null;
+    }
+
+    function askDelete(name) {
+        var r = root.rowByName(name);
+        if (r) {
+            root.pendingKind = r.kind;
+            root.pendingText = r.text;
+            root.pendingUrl = r.url;
         }
         root.pendingDelete = name;
     }
@@ -451,15 +457,12 @@ Rectangle {
     // Long-press menu: mirror the row's content so the menu can preview it and
     // the editor can start from it, then show the menu.
     function openRowMenu(name) {
-        for (var i = 0; i < rows.count; i++) {
-            var r = rows.get(i);
-            if (r.name === name) {
-                root.menuBase = r.base;
-                root.menuKind = r.kind;
-                root.menuText = r.text;
-                root.menuUrl = r.url;
-                break;
-            }
+        var r = root.rowByName(name);
+        if (r) {
+            root.menuBase = r.base;
+            root.menuKind = r.kind;
+            root.menuText = r.text;
+            root.menuUrl = r.url;
         }
         root.menuName = name;
     }
