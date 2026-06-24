@@ -24,7 +24,7 @@ Item {
     signal toggleClicked
     signal longPressed
 
-    // Long-press anywhere on the row opens the delete confirmation.
+    // Long-press anywhere on the row opens the action menu (Modify / Delete).
     // Declared first so it sits below the toggle (toggle taps still win);
     // it only handles press-and-hold, so list flicking is unaffected.
     MouseArea {

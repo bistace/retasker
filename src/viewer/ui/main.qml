@@ -60,6 +60,20 @@ Rectangle {
     property string pendingText: ""
     property string pendingUrl: ""
 
+    // Row action menu (long-press): pick Modify or Delete for a todo. menuName is
+    // the row's filename and drives visibility; the rest preview the todo and seed
+    // the editor.
+    property string menuName: ""
+    property string menuBase: ""
+    property string menuKind: ""
+    property string menuText: ""
+    property string menuUrl: ""
+
+    // Edit sheet: editName (a row filename) drives visibility; editBase keys the
+    // write. The field starts from the current transcription (empty for an image).
+    property string editName: ""
+    property string editBase: ""
+
     // Day-notes sheet: addNoteDay is the day it acts on (set when opened);
     // addSheetMode is "list" (browse/open the day's notes) or "new" (title entry).
     property bool addNoteOpen: false
@@ -274,6 +288,59 @@ Rectangle {
                 break;
             }
         }
+    }
+
+    // Long-press menu: mirror the row's content so the menu can preview it and
+    // the editor can start from it, then show the menu.
+    function openRowMenu(name) {
+        for (var i = 0; i < rows.count; i++) {
+            var r = rows.get(i);
+            if (r.name === name) {
+                root.menuBase = r.base;
+                root.menuKind = r.kind;
+                root.menuText = r.text;
+                root.menuUrl = r.url;
+                break;
+            }
+        }
+        root.menuName = name;
+    }
+
+    function editFromMenu() {
+        root.editBase = root.menuBase;
+        root.editName = root.menuName;
+        editField.text = root.menuText;
+        root.menuName = "";
+        editField.forceActiveFocus();
+    }
+
+    function deleteFromMenu() {
+        var name = root.menuName;
+        root.menuName = "";
+        root.askDelete(name);
+    }
+
+    // Save an edited todo. Reuses the transcribe write path: the native side
+    // writes <base>.txt and (for an image todo) drops the .png, so editing an
+    // untranscribed image doubles as a manual transcription. <base>.png is the
+    // payload name the handler expects even when the .png is already gone — the
+    // remove is then a harmless no-op.
+    function saveEdit() {
+        var text = editField.text.trim();
+        if (text === "")
+            return;
+        broker.sendSimpleSignal("retasker.transcribe", root.editBase + ".png " + encodeURIComponent(text));
+        root.applyTranscription(root.editBase, text);
+        root.closeEdit();
+    }
+
+    // Close the edit sheet and dismiss the on-screen keyboard. Dropping the
+    // field's focus alone isn't enough on the device; the input method has to be
+    // hidden explicitly or the keyboard lingers over the list.
+    function closeEdit() {
+        editField.focus = false;
+        root.editName = "";
+        Qt.inputMethod.hide();
     }
 
     // Move the calendar forward/back by whole months, rolling the year over.
@@ -870,7 +937,7 @@ Rectangle {
             done: model.done
             dateText: model.dateText
             onToggleClicked: root.toggle(model.base)
-            onLongPressed: root.askDelete(model.name)
+            onLongPressed: root.openRowMenu(model.name)
         }
     }
 
@@ -1118,6 +1185,277 @@ Rectangle {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: root.confirmDelete()
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Row action menu (long-press) ------------------------------------
+    // Opaque modal: long-pressing a row sets menuName, which shows this. Modify
+    // opens the edit sheet; Delete drops to the existing delete confirmation.
+    Rectangle {
+        id: rowMenu
+        anchors.fill: parent
+        visible: root.menuName !== ""
+        color: "white"
+
+        // Swallow taps so nothing behind the modal reacts.
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 720
+            height: 740
+            color: "white"
+            border.color: "black"
+            border.width: 4
+
+            // Preview of the todo being acted on — its text, or the snippet image.
+            Rectangle {
+                id: menuPreview
+                anchors {
+                    top: parent.top
+                    topMargin: 48
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
+                }
+                height: 200
+                color: "white"
+                border.color: "black"
+                border.width: 2
+
+                Text {
+                    anchors {
+                        fill: parent
+                        margins: 20
+                    }
+                    visible: root.menuKind === "text"
+                    text: root.menuText
+                    font.pixelSize: 36
+                    color: "black"
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    wrapMode: Text.WordWrap
+                    maximumLineCount: 3
+                    elide: Text.ElideRight
+                }
+
+                Image {
+                    anchors {
+                        fill: parent
+                        margins: 16
+                    }
+                    visible: root.menuKind === "image"
+                    source: root.menuKind === "image" ? root.menuUrl : ""
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    asynchronous: true
+                }
+            }
+
+            Column {
+                anchors {
+                    top: menuPreview.bottom
+                    topMargin: 40
+                    horizontalCenter: parent.horizontalCenter
+                }
+                spacing: 28
+
+                // Modify a text todo; for an image, the same action is a manual
+                // transcription, so it reads "Transcribe".
+                Rectangle {
+                    width: 560
+                    height: 100
+                    color: "black"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: root.menuKind === "image" ? "Transcribe" : "Modify"
+                        font.pixelSize: 40
+                        color: "white"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.editFromMenu()
+                    }
+                }
+
+                Rectangle {
+                    width: 560
+                    height: 100
+                    color: "white"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Delete"
+                        font.pixelSize: 40
+                        color: "black"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.deleteFromMenu()
+                    }
+                }
+
+                Rectangle {
+                    width: 560
+                    height: 100
+                    color: "white"
+                    border.color: "#aaaaaa"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Cancel"
+                        font.pixelSize: 40
+                        color: "black"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.menuName = ""
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Edit sheet -------------------------------------------------------
+    // Modify a todo's text. Saving writes <base>.txt through the transcribe
+    // path; for an image todo that also drops the .png (a manual transcription).
+    // Text entry relies on the device on-screen keyboard appearing on focus.
+    Rectangle {
+        id: editSheet
+        anchors.fill: parent
+        visible: root.editName !== ""
+        color: "white"
+
+        // Swallow taps so nothing behind the modal reacts.
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 820
+            height: 720
+            color: "white"
+            border.color: "black"
+            border.width: 4
+
+            Text {
+                id: editTitle
+                anchors {
+                    top: parent.top
+                    topMargin: 40
+                    left: parent.left
+                    leftMargin: 48
+                }
+                text: "Edit todo"
+                font.pixelSize: 44
+                font.bold: true
+                color: "black"
+            }
+
+            Rectangle {
+                id: editBox
+                anchors {
+                    top: editTitle.bottom
+                    topMargin: 28
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
+                    bottom: editButtons.top
+                    bottomMargin: 40
+                }
+                color: "white"
+                border.color: "black"
+                border.width: 3
+
+                Flickable {
+                    anchors {
+                        fill: parent
+                        margins: 20
+                    }
+                    contentWidth: width
+                    contentHeight: editField.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    TextEdit {
+                        id: editField
+                        width: parent.width
+                        font.pixelSize: 38
+                        color: "black"
+                        wrapMode: TextEdit.Wrap
+                        selectByMouse: false
+                    }
+                }
+
+                Text {
+                    anchors {
+                        left: parent.left
+                        leftMargin: 20
+                        top: parent.top
+                        topMargin: 20
+                    }
+                    visible: editField.text === ""
+                    text: "Type the todo text"
+                    font.pixelSize: 38
+                    color: "#888888"
+                }
+            }
+
+            Row {
+                id: editButtons
+                anchors {
+                    bottom: parent.bottom
+                    bottomMargin: 40
+                    horizontalCenter: parent.horizontalCenter
+                }
+                spacing: 40
+
+                Rectangle {
+                    width: 260
+                    height: 100
+                    color: "white"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Cancel"
+                        font.pixelSize: 40
+                        color: "black"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.closeEdit()
+                    }
+                }
+
+                Rectangle {
+                    readonly property bool ready: editField.text.trim() !== ""
+                    width: 260
+                    height: 100
+                    color: ready ? "black" : "white"
+                    border.color: ready ? "black" : "#aaaaaa"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Save"
+                        font.pixelSize: 40
+                        color: parent.ready ? "white" : "#aaaaaa"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: editField.text.trim() !== ""
+                        onClicked: root.saveEdit()
                     }
                 }
             }
