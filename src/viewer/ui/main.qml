@@ -76,6 +76,17 @@ Rectangle {
     property string editName: ""
     property string editBase: ""
 
+    // Add-todo sheet: a todo typed in the viewer instead of captured. addTodoOpen
+    // drives visibility; addTodoDay ("y-m-d") is the day it's filed under. Calendar
+    // view fixes that to the active day; list view picks it with the embedded month
+    // grid (addPickYear/Month drive which month it shows). addSeq disambiguates the
+    // base when several todos are added within the same millisecond.
+    property bool addTodoOpen: false
+    property string addTodoDay: ""
+    property int addPickYear: 0
+    property int addPickMonth: 0
+    property int addSeq: 0
+
     // Day-notes sheet: addNoteDay is the day it acts on (set when opened);
     // addSheetMode is "list" (browse/open the day's notes) or "new" (title entry).
     property bool addNoteOpen: false
@@ -114,6 +125,7 @@ Rectangle {
     readonly property int msgDelete: 4
     readonly property int msgIngest: 5
     readonly property int msgCal: 6
+    readonly property int msgAdd: 7
     readonly property int msgReady: 100
     readonly property int msgRows: 101
     readonly property int msgIngested: 102
@@ -471,6 +483,65 @@ Rectangle {
         editField.focus = false;
         root.editName = "";
         Qt.inputMethod.hide();
+    }
+
+    // Open the add-todo sheet. Calendar view files the new todo under the active
+    // day; list view starts on today and lets the user pick another via the grid.
+    function openAddTodo() {
+        root.addTodoDay = root.viewMode === "calendar" ? root.activeDay() : root.todayKey;
+        var p = root.addTodoDay.split("-");
+        root.addPickYear = parseInt(p[0], 10);
+        root.addPickMonth = parseInt(p[1], 10) - 1;
+        addField.text = "";
+        root.addTodoOpen = true;
+        addField.forceActiveFocus();
+    }
+
+    // Capture-time for a day picked in the add sheet: the day at the current
+    // time-of-day, so a todo dated today reads "now" and one for another day still
+    // falls inside that day's [midnight, next-midnight) calendar window.
+    function dayTs(key) {
+        var p = key.split("-");
+        var now = new Date();
+        return new Date(p[0], p[1] - 1, p[2], now.getHours(), now.getMinutes(), now.getSeconds()).getTime();
+    }
+
+    // Save a typed-in todo: insert a text row dated to the chosen day. The backend
+    // processes this before the re-query that follows, so refresh() shows it.
+    function saveAddTodo() {
+        var text = addField.text.trim();
+        if (text === "")
+            return;
+        root.addSeq += 1;
+        backend.sendMessage(root.msgAdd, JSON.stringify({
+            base: "man-" + (new Date()).getTime() + "-" + root.addSeq,
+            ts: root.dayTs(root.addTodoDay),
+            text: text
+        }));
+        root.closeAddTodo();
+        root.refresh();
+    }
+
+    function closeAddTodo() {
+        addField.focus = false;
+        root.addTodoOpen = false;
+        Qt.inputMethod.hide();
+    }
+
+    // Move the add sheet's date picker forward/back by whole months.
+    function shiftAddMonth(delta) {
+        var m = root.addPickMonth + delta;
+        var y = root.addPickYear;
+        while (m < 0) {
+            m += 12;
+            y -= 1;
+        }
+        while (m > 11) {
+            m -= 12;
+            y += 1;
+        }
+        root.addPickMonth = m;
+        root.addPickYear = y;
     }
 
     // Move the calendar forward/back by whole months, rolling the year over.
@@ -1083,6 +1154,33 @@ Rectangle {
         color: "black"
     }
 
+    // Add a typed-in todo. The modals declared after this are opaque and cover it
+    // while open, so it only needs to step aside for the settings page.
+    Rectangle {
+        id: addFab
+        visible: !root.settingsOpen
+        width: 120
+        height: 120
+        radius: 60
+        color: "black"
+        anchors {
+            right: parent.right
+            rightMargin: 48
+            bottom: parent.bottom
+            bottomMargin: 48
+        }
+        Text {
+            anchors.centerIn: parent
+            text: "+"
+            font.pixelSize: 80
+            color: "white"
+        }
+        MouseArea {
+            anchors.fill: parent
+            onClicked: root.openAddTodo()
+        }
+    }
+
     // --- Settings ---------------------------------------------------------
     Rectangle {
         id: settingsPage
@@ -1590,6 +1688,186 @@ Rectangle {
                         anchors.fill: parent
                         enabled: editField.text.trim() !== ""
                         onClicked: root.saveEdit()
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Add-todo sheet ---------------------------------------------------
+    // Type a todo instead of capturing it. The date row is fixed to the active
+    // day in calendar view; in list view the embedded month grid picks it. Text
+    // entry relies on the device on-screen keyboard appearing when the field gains
+    // focus.
+    Rectangle {
+        id: addTodoSheet
+        anchors.fill: parent
+        visible: root.addTodoOpen
+        color: "white"
+
+        // Swallow taps so nothing behind the modal reacts.
+        MouseArea {
+            anchors.fill: parent
+        }
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: 840
+            height: root.viewMode === "calendar" ? 720 : 1180
+            color: "white"
+            border.color: "black"
+            border.width: 4
+
+            Text {
+                id: addTodoTitle
+                anchors {
+                    top: parent.top
+                    topMargin: 40
+                    left: parent.left
+                    leftMargin: 48
+                }
+                text: "Add todo"
+                font.pixelSize: 44
+                font.bold: true
+                color: "black"
+            }
+
+            Rectangle {
+                id: addBox
+                anchors {
+                    top: addTodoTitle.bottom
+                    topMargin: 28
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
+                }
+                height: 240
+                color: "white"
+                border.color: "black"
+                border.width: 3
+
+                Flickable {
+                    anchors {
+                        fill: parent
+                        margins: 20
+                    }
+                    contentWidth: width
+                    contentHeight: addField.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    TextEdit {
+                        id: addField
+                        width: parent.width
+                        font.pixelSize: 38
+                        color: "black"
+                        wrapMode: TextEdit.Wrap
+                        selectByMouse: false
+                    }
+                }
+
+                Text {
+                    anchors {
+                        left: parent.left
+                        leftMargin: 20
+                        top: parent.top
+                        topMargin: 20
+                    }
+                    visible: addField.text === ""
+                    text: "Type the todo text"
+                    font.pixelSize: 38
+                    color: "#888888"
+                }
+            }
+
+            Text {
+                id: addDateLabel
+                anchors {
+                    top: addBox.bottom
+                    topMargin: 28
+                    left: parent.left
+                    leftMargin: 48
+                    right: parent.right
+                    rightMargin: 48
+                }
+                text: "For " + root.dayLabel(root.addTodoDay)
+                font.pixelSize: 34
+                font.bold: true
+                color: "black"
+                elide: Text.ElideRight
+            }
+
+            // List view: pick the date. Calendar view keeps the active day, so the
+            // grid is hidden there.
+            MonthView {
+                id: addPicker
+                visible: root.viewMode !== "calendar"
+                anchors {
+                    top: addDateLabel.bottom
+                    topMargin: 16
+                    left: parent.left
+                    leftMargin: 24
+                    right: parent.right
+                    rightMargin: 24
+                    bottom: addTodoButtons.top
+                    bottomMargin: 24
+                }
+                year: root.addPickYear
+                month: root.addPickMonth
+                todayKey: root.todayKey
+                selectedKey: root.addTodoDay
+                onDayClicked: function (key) {
+                    root.addTodoDay = key;
+                }
+                onPrevMonth: root.shiftAddMonth(-1)
+                onNextMonth: root.shiftAddMonth(1)
+            }
+
+            Row {
+                id: addTodoButtons
+                anchors {
+                    bottom: parent.bottom
+                    bottomMargin: 40
+                    horizontalCenter: parent.horizontalCenter
+                }
+                spacing: 40
+
+                Rectangle {
+                    width: 260
+                    height: 100
+                    color: "white"
+                    border.color: "black"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Cancel"
+                        font.pixelSize: 40
+                        color: "black"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.closeAddTodo()
+                    }
+                }
+
+                Rectangle {
+                    readonly property bool ready: addField.text.trim() !== ""
+                    width: 260
+                    height: 100
+                    color: ready ? "black" : "white"
+                    border.color: ready ? "black" : "#aaaaaa"
+                    border.width: 3
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Add"
+                        font.pixelSize: 40
+                        color: parent.ready ? "white" : "#aaaaaa"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: addField.text.trim() !== ""
+                        onClicked: root.saveAddTodo()
                     }
                 }
             }
