@@ -1,5 +1,16 @@
 .pragma library
 
+// A todo's time is the capture instant encoded in its base name
+// (cap-<unix-seconds>-<counter>), not the file's mtime: editing a todo rewrites
+// its .txt and would otherwise bump it to "now". Fall back to mtime for any file
+// that doesn't carry a timestamp.
+function captureTime(base, mtime) {
+    var m = /^cap-(\d+)-\d+$/.exec(base);
+    if (m)
+        return new Date(parseInt(m[1], 10) * 1000);
+    return mtime;
+}
+
 // Group capture files into todos, keyed by base name (e.g. "cap-123-0").
 // A todo is either an image (.png, freshly captured) or text (.txt, the OCR
 // transcription). If both exist for a base, the transcription wins.
@@ -19,7 +30,7 @@ function collect(folderModel) {
             name: name,
             kind: kind,
             url: "" + folderModel.get(i, "fileURL"),
-            mtime: folderModel.get(i, "fileModified")
+            mtime: captureTime(base, folderModel.get(i, "fileModified"))
         };
     }
     var out = [];
