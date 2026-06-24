@@ -362,21 +362,31 @@ Rectangle {
         }
     }
 
-    function loadOcrConfig() {
+    // GET a local JSON file and hand the parsed object to onParsed; passes null
+    // when the file is missing/empty or doesn't parse, so callers decide.
+    function loadJson(path, onParsed) {
         var xhr = new XMLHttpRequest();
-        xhr.open("GET", root.appDir + "/config.json");
+        xhr.open("GET", path);
         xhr.onreadystatechange = function () {
             if (xhr.readyState !== XMLHttpRequest.DONE)
                 return;
+            var data = null;
             try {
-                root.ocrConfig = JSON.parse(xhr.responseText);
+                data = JSON.parse(xhr.responseText);
             } catch (e) {
-                root.ocrConfig = null;
+                data = null;
             }
-            if (root.ocrConfig)
-                root.syncFolder();
+            onParsed(data);
         };
         xhr.send();
+    }
+
+    function loadOcrConfig() {
+        root.loadJson(root.appDir + "/config.json", function (data) {
+            root.ocrConfig = data;
+            if (root.ocrConfig)
+                root.syncFolder();
+        });
     }
 
     function toggle(base) {
@@ -690,20 +700,11 @@ Rectangle {
     }
 
     function loadTemplateConfig() {
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", root.appDir + "/template.json");
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState !== XMLHttpRequest.DONE)
-                return;
-            if (!xhr.responseText)
-                return;
-            try {
-                root.applyTemplateConfig(JSON.parse(xhr.responseText));
-            } catch (e) {
-                root.applyTemplateConfig({});
-            }
-        };
-        xhr.send();
+        root.loadJson(root.appDir + "/template.json", function (data) {
+            // Missing/empty/unreadable: keep the saved template defaults.
+            if (data !== null)
+                root.applyTemplateConfig(data);
+        });
     }
 
     // --- Header: title, filter segments, close ---------------------------
