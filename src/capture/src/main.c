@@ -92,6 +92,32 @@ static uint8_t *crop_rgb(const struct fb_config *c, const struct rect *r) {
     return out;
 }
 
+// Rotates a tight RGB buffer clockwise by rot degrees (90/180/270) into a fresh
+// buffer; the caller frees the source. For 90/270 the width and height swap, so
+// *w/*h are updated to the rotated dimensions. Used to undo xochitl's landscape
+// canvas rotation, which otherwise leaves the crop turned 90 degrees.
+static uint8_t *rotate_rgb(const uint8_t *src, int *w, int *h, int rot) {
+    const int W = *w, H = *h;
+    const int ow = (rot == 180) ? W : H;
+    const int oh = (rot == 180) ? H : W;
+    uint8_t *out = malloc((size_t)ow * oh * 3);
+    if (out == NULL) return NULL;
+    for (int sy = 0; sy < H; sy++) {
+        for (int sx = 0; sx < W; sx++) {
+            int dx = rot == 90 ? H - 1 - sy : rot == 270 ? sy : W - 1 - sx;
+            int dy = rot == 90 ? sx : rot == 270 ? W - 1 - sx : H - 1 - sy;
+            const uint8_t *s = src + ((size_t)sy * W + sx) * 3;
+            uint8_t *d = out + ((size_t)dy * ow + dx) * 3;
+            d[0] = s[0];
+            d[1] = s[1];
+            d[2] = s[2];
+        }
+    }
+    *w = ow;
+    *h = oh;
+    return out;
+}
+
 static char *write_png(const uint8_t *rgb, const struct rect *r) {
     static int counter = 0;
     mkdir(CAPTURE_DIR, 0755);
@@ -141,6 +167,17 @@ char *captureHandler(const char *value) {
 
     uint8_t *rgb = crop_rgb(&c, &r);
     if (rgb == NULL) return NULL;
+
+    // Landscape pages render rotated inside the portrait framebuffer; the QML
+    // sends the rotation needed to bring the crop back upright (0 in portrait).
+    int rot = (int)json_int(value, "\"rotation\"");
+    if (rot == 90 || rot == 180 || rot == 270) {
+        uint8_t *rotated = rotate_rgb(rgb, &r.w, &r.h, rot);
+        free(rgb);
+        if (rotated == NULL) return NULL;
+        rgb = rotated;
+    }
+
     char *path = write_png(rgb, &r);
     free(rgb);
     return path;
