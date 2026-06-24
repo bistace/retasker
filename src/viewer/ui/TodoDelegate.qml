@@ -47,28 +47,11 @@ Item {
         border.color: "black"
         border.width: 4
 
-        Canvas {
-            id: checkmark
+        CheckMark {
             anchors.centerIn: parent
-            width: 34
-            height: 34
+            dim: 34
+            stroke: 5
             visible: row.done
-            onPaint: {
-                var ctx = getContext("2d");
-                ctx.reset();
-                ctx.strokeStyle = "white";
-                ctx.lineWidth = 5;
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                ctx.beginPath();
-                ctx.moveTo(width * 0.18, height * 0.52);
-                ctx.lineTo(width * 0.42, height * 0.76);
-                ctx.lineTo(width * 0.84, height * 0.24);
-                ctx.stroke();
-            }
-            onVisibleChanged: if (visible)
-                requestPaint()
-            Component.onCompleted: requestPaint()
         }
 
         MouseArea {

@@ -1037,26 +1037,10 @@ Rectangle {
                 visible: root.selectedDay === "" && root.monthAllDone
                 color: "black"
 
-                Canvas {
+                CheckMark {
                     anchors.centerIn: parent
-                    width: 30
-                    height: 30
-                    onPaint: {
-                        var ctx = getContext("2d");
-                        ctx.reset();
-                        ctx.strokeStyle = "white";
-                        ctx.lineWidth = 5;
-                        ctx.lineCap = "round";
-                        ctx.lineJoin = "round";
-                        ctx.beginPath();
-                        ctx.moveTo(width * 0.18, height * 0.52);
-                        ctx.lineTo(width * 0.42, height * 0.76);
-                        ctx.lineTo(width * 0.84, height * 0.24);
-                        ctx.stroke();
-                    }
-                    onVisibleChanged: if (visible)
-                        requestPaint()
-                    Component.onCompleted: requestPaint()
+                    dim: 30
+                    stroke: 5
                 }
             }
         }
