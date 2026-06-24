@@ -6,6 +6,7 @@
         <file>ui/CheckMark.qml</file>
         <file>ui/CloseGlyph.qml</file>
         <file>ui/FlatButton.qml</file>
+        <file>ui/ModalSheet.qml</file>
         <file>ui/store.js</file>
         <file>ui/ocr.js</file>
         <file>ui/calendar.js</file>

@@ -1224,112 +1224,98 @@ Rectangle {
 
     // --- Delete confirmation ---------------------------------------------
     // Opaque modal: long-pressing a row sets pendingDelete, which shows this.
-    Rectangle {
+    ModalSheet {
         id: confirm
-        anchors.fill: parent
-        visible: root.pendingDelete !== ""
-        color: "white"
+        open: root.pendingDelete !== ""
+        cardWidth: 720
+        cardHeight: 560
 
-        // Swallow taps so nothing behind the modal reacts.
-        MouseArea {
-            anchors.fill: parent
+        Text {
+            id: confirmTitle
+            anchors {
+                top: parent.top
+                topMargin: 48
+                horizontalCenter: parent.horizontalCenter
+            }
+            text: "Delete this todo?"
+            font.pixelSize: 46
+            font.bold: true
+            color: "black"
         }
 
+        // Preview of the todo being deleted — the text, or the snippet image.
         Rectangle {
-            anchors.centerIn: parent
-            width: 720
-            height: 560
+            id: preview
+            anchors {
+                top: confirmTitle.bottom
+                topMargin: 32
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+            }
+            height: 180
             color: "white"
             border.color: "black"
-            border.width: 4
-
-            Text {
-                id: confirmTitle
-                anchors {
-                    top: parent.top
-                    topMargin: 48
-                    horizontalCenter: parent.horizontalCenter
-                }
-                text: "Delete this todo?"
-                font.pixelSize: 46
-                font.bold: true
-                color: "black"
-            }
-
-            // Preview of the todo being deleted — the text, or the snippet image.
-            Rectangle {
-                id: preview
-                anchors {
-                    top: confirmTitle.bottom
-                    topMargin: 32
-                    left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 48
-                }
-                height: 180
-                color: "white"
-                border.color: "black"
-                border.width: 2
-
-                Text {
-                    anchors {
-                        fill: parent
-                        margins: 20
-                    }
-                    visible: root.pendingKind === "text"
-                    text: root.pendingText
-                    font.pixelSize: 36
-                    color: "black"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    wrapMode: Text.WordWrap
-                    maximumLineCount: 3
-                    elide: Text.ElideRight
-                }
-
-                Image {
-                    anchors {
-                        fill: parent
-                        margins: 16
-                    }
-                    visible: root.pendingKind === "image"
-                    source: root.pendingKind === "image" ? root.pendingUrl : ""
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    asynchronous: true
-                }
-            }
+            border.width: 2
 
             Text {
                 anchors {
-                    top: preview.bottom
-                    topMargin: 24
-                    horizontalCenter: parent.horizontalCenter
+                    fill: parent
+                    margins: 20
                 }
-                text: "This cannot be undone."
-                font.pixelSize: 30
+                visible: root.pendingKind === "text"
+                text: root.pendingText
+                font.pixelSize: 36
                 color: "black"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                wrapMode: Text.WordWrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
             }
 
-            Row {
+            Image {
                 anchors {
-                    bottom: parent.bottom
-                    bottomMargin: 48
-                    horizontalCenter: parent.horizontalCenter
+                    fill: parent
+                    margins: 16
                 }
-                spacing: 40
+                visible: root.pendingKind === "image"
+                source: root.pendingKind === "image" ? root.pendingUrl : ""
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                asynchronous: true
+            }
+        }
 
-                FlatButton {
-                    text: "Cancel"
-                    onClicked: root.pendingDelete = ""
-                }
+        Text {
+            anchors {
+                top: preview.bottom
+                topMargin: 24
+                horizontalCenter: parent.horizontalCenter
+            }
+            text: "This cannot be undone."
+            font.pixelSize: 30
+            color: "black"
+        }
 
-                FlatButton {
-                    primary: true
-                    text: "Delete"
-                    onClicked: root.confirmDelete()
-                }
+        Row {
+            anchors {
+                bottom: parent.bottom
+                bottomMargin: 48
+                horizontalCenter: parent.horizontalCenter
+            }
+            spacing: 40
+
+            FlatButton {
+                text: "Cancel"
+                onClicked: root.pendingDelete = ""
+            }
+
+            FlatButton {
+                primary: true
+                text: "Delete"
+                onClicked: root.confirmDelete()
             }
         }
     }
@@ -1337,98 +1323,84 @@ Rectangle {
     // --- Row action menu (long-press) ------------------------------------
     // Opaque modal: long-pressing a row sets menuName, which shows this. Modify
     // opens the edit sheet; Delete drops to the existing delete confirmation.
-    Rectangle {
+    ModalSheet {
         id: rowMenu
-        anchors.fill: parent
-        visible: root.menuName !== ""
-        color: "white"
+        open: root.menuName !== ""
+        cardWidth: 720
+        cardHeight: 740
 
-        // Swallow taps so nothing behind the modal reacts.
-        MouseArea {
-            anchors.fill: parent
-        }
-
+        // Preview of the todo being acted on — its text, or the snippet image.
         Rectangle {
-            anchors.centerIn: parent
-            width: 720
-            height: 740
+            id: menuPreview
+            anchors {
+                top: parent.top
+                topMargin: 48
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+            }
+            height: 200
             color: "white"
             border.color: "black"
-            border.width: 4
+            border.width: 2
 
-            // Preview of the todo being acted on — its text, or the snippet image.
-            Rectangle {
-                id: menuPreview
+            Text {
                 anchors {
-                    top: parent.top
-                    topMargin: 48
-                    left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 48
+                    fill: parent
+                    margins: 20
                 }
-                height: 200
-                color: "white"
-                border.color: "black"
-                border.width: 2
-
-                Text {
-                    anchors {
-                        fill: parent
-                        margins: 20
-                    }
-                    visible: root.menuKind === "text"
-                    text: root.menuText
-                    font.pixelSize: 36
-                    color: "black"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    wrapMode: Text.WordWrap
-                    maximumLineCount: 3
-                    elide: Text.ElideRight
-                }
-
-                Image {
-                    anchors {
-                        fill: parent
-                        margins: 16
-                    }
-                    visible: root.menuKind === "image"
-                    source: root.menuKind === "image" ? root.menuUrl : ""
-                    fillMode: Image.PreserveAspectFit
-                    smooth: true
-                    asynchronous: true
-                }
+                visible: root.menuKind === "text"
+                text: root.menuText
+                font.pixelSize: 36
+                color: "black"
+                horizontalAlignment: Text.AlignHCenter
+                verticalAlignment: Text.AlignVCenter
+                wrapMode: Text.WordWrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
             }
 
-            Column {
+            Image {
                 anchors {
-                    top: menuPreview.bottom
-                    topMargin: 40
-                    horizontalCenter: parent.horizontalCenter
+                    fill: parent
+                    margins: 16
                 }
-                spacing: 28
+                visible: root.menuKind === "image"
+                source: root.menuKind === "image" ? root.menuUrl : ""
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                asynchronous: true
+            }
+        }
 
-                // Modify a text todo; for an image, the same action is a manual
-                // transcription, so it reads "Transcribe".
-                FlatButton {
-                    width: 560
-                    primary: true
-                    text: root.menuKind === "image" ? "Transcribe" : "Modify"
-                    onClicked: root.editFromMenu()
-                }
+        Column {
+            anchors {
+                top: menuPreview.bottom
+                topMargin: 40
+                horizontalCenter: parent.horizontalCenter
+            }
+            spacing: 28
 
-                FlatButton {
-                    width: 560
-                    text: "Delete"
-                    onClicked: root.deleteFromMenu()
-                }
+            // Modify a text todo; for an image, the same action is a manual
+            // transcription, so it reads "Transcribe".
+            FlatButton {
+                width: 560
+                primary: true
+                text: root.menuKind === "image" ? "Transcribe" : "Modify"
+                onClicked: root.editFromMenu()
+            }
 
-                FlatButton {
-                    width: 560
-                    text: "Cancel"
-                    onClicked: root.menuName = ""
-                }
+            FlatButton {
+                width: 560
+                text: "Delete"
+                onClicked: root.deleteFromMenu()
+            }
+
+            FlatButton {
+                width: 560
+                text: "Cancel"
+                onClicked: root.menuName = ""
             }
         }
     }
@@ -1437,109 +1409,95 @@ Rectangle {
     // Modify a todo's text. Saving writes <base>.txt through the transcribe
     // path; for an image todo that also drops the .png (a manual transcription).
     // Text entry relies on the device on-screen keyboard appearing on focus.
-    Rectangle {
+    ModalSheet {
         id: editSheet
-        anchors.fill: parent
-        visible: root.editName !== ""
-        color: "white"
+        open: root.editName !== ""
+        cardWidth: 820
+        cardHeight: 720
 
-        // Swallow taps so nothing behind the modal reacts.
-        MouseArea {
-            anchors.fill: parent
+        Text {
+            id: editTitle
+            anchors {
+                top: parent.top
+                topMargin: 40
+                left: parent.left
+                leftMargin: 48
+            }
+            text: "Edit todo"
+            font.pixelSize: 44
+            font.bold: true
+            color: "black"
         }
 
         Rectangle {
-            anchors.centerIn: parent
-            width: 820
-            height: 720
+            id: editBox
+            anchors {
+                top: editTitle.bottom
+                topMargin: 28
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+                bottom: editButtons.top
+                bottomMargin: 40
+            }
             color: "white"
             border.color: "black"
-            border.width: 4
+            border.width: 3
+
+            Flickable {
+                anchors {
+                    fill: parent
+                    margins: 20
+                }
+                contentWidth: width
+                contentHeight: editField.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+
+                TextEdit {
+                    id: editField
+                    width: parent.width
+                    font.pixelSize: 38
+                    color: "black"
+                    wrapMode: TextEdit.Wrap
+                    selectByMouse: false
+                }
+            }
 
             Text {
-                id: editTitle
                 anchors {
+                    left: parent.left
+                    leftMargin: 20
                     top: parent.top
-                    topMargin: 40
-                    left: parent.left
-                    leftMargin: 48
+                    topMargin: 20
                 }
-                text: "Edit todo"
-                font.pixelSize: 44
-                font.bold: true
-                color: "black"
+                visible: editField.text === ""
+                text: "Type the todo text"
+                font.pixelSize: 38
+                color: "#888888"
+            }
+        }
+
+        Row {
+            id: editButtons
+            anchors {
+                bottom: parent.bottom
+                bottomMargin: 40
+                horizontalCenter: parent.horizontalCenter
+            }
+            spacing: 40
+
+            FlatButton {
+                text: "Cancel"
+                onClicked: root.closeEdit()
             }
 
-            Rectangle {
-                id: editBox
-                anchors {
-                    top: editTitle.bottom
-                    topMargin: 28
-                    left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 48
-                    bottom: editButtons.top
-                    bottomMargin: 40
-                }
-                color: "white"
-                border.color: "black"
-                border.width: 3
-
-                Flickable {
-                    anchors {
-                        fill: parent
-                        margins: 20
-                    }
-                    contentWidth: width
-                    contentHeight: editField.implicitHeight
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    TextEdit {
-                        id: editField
-                        width: parent.width
-                        font.pixelSize: 38
-                        color: "black"
-                        wrapMode: TextEdit.Wrap
-                        selectByMouse: false
-                    }
-                }
-
-                Text {
-                    anchors {
-                        left: parent.left
-                        leftMargin: 20
-                        top: parent.top
-                        topMargin: 20
-                    }
-                    visible: editField.text === ""
-                    text: "Type the todo text"
-                    font.pixelSize: 38
-                    color: "#888888"
-                }
-            }
-
-            Row {
-                id: editButtons
-                anchors {
-                    bottom: parent.bottom
-                    bottomMargin: 40
-                    horizontalCenter: parent.horizontalCenter
-                }
-                spacing: 40
-
-                FlatButton {
-                    text: "Cancel"
-                    onClicked: root.closeEdit()
-                }
-
-                FlatButton {
-                    primary: true
-                    enabled: editField.text.trim() !== ""
-                    text: "Save"
-                    onClicked: root.saveEdit()
-                }
+            FlatButton {
+                primary: true
+                enabled: editField.text.trim() !== ""
+                text: "Save"
+                onClicked: root.saveEdit()
             }
         }
     }
@@ -1549,151 +1507,137 @@ Rectangle {
     // day in calendar view; in list view the embedded month grid picks it. Text
     // entry relies on the device on-screen keyboard appearing when the field gains
     // focus.
-    Rectangle {
+    ModalSheet {
         id: addTodoSheet
-        anchors.fill: parent
-        visible: root.addTodoOpen
-        color: "white"
+        open: root.addTodoOpen
+        cardWidth: 840
+        cardHeight: root.viewMode === "calendar" ? 720 : 1180
 
-        // Swallow taps so nothing behind the modal reacts.
-        MouseArea {
-            anchors.fill: parent
+        Text {
+            id: addTodoTitle
+            anchors {
+                top: parent.top
+                topMargin: 40
+                left: parent.left
+                leftMargin: 48
+            }
+            text: "Add todo"
+            font.pixelSize: 44
+            font.bold: true
+            color: "black"
         }
 
         Rectangle {
-            anchors.centerIn: parent
-            width: 840
-            height: root.viewMode === "calendar" ? 720 : 1180
+            id: addBox
+            anchors {
+                top: addTodoTitle.bottom
+                topMargin: 28
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+            }
+            height: 240
             color: "white"
             border.color: "black"
-            border.width: 4
+            border.width: 3
 
-            Text {
-                id: addTodoTitle
+            Flickable {
                 anchors {
-                    top: parent.top
-                    topMargin: 40
-                    left: parent.left
-                    leftMargin: 48
+                    fill: parent
+                    margins: 20
                 }
-                text: "Add todo"
-                font.pixelSize: 44
-                font.bold: true
-                color: "black"
-            }
+                contentWidth: width
+                contentHeight: addField.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
 
-            Rectangle {
-                id: addBox
-                anchors {
-                    top: addTodoTitle.bottom
-                    topMargin: 28
-                    left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 48
-                }
-                height: 240
-                color: "white"
-                border.color: "black"
-                border.width: 3
-
-                Flickable {
-                    anchors {
-                        fill: parent
-                        margins: 20
-                    }
-                    contentWidth: width
-                    contentHeight: addField.implicitHeight
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-
-                    TextEdit {
-                        id: addField
-                        width: parent.width
-                        font.pixelSize: 38
-                        color: "black"
-                        wrapMode: TextEdit.Wrap
-                        selectByMouse: false
-                    }
-                }
-
-                Text {
-                    anchors {
-                        left: parent.left
-                        leftMargin: 20
-                        top: parent.top
-                        topMargin: 20
-                    }
-                    visible: addField.text === ""
-                    text: "Type the todo text"
+                TextEdit {
+                    id: addField
+                    width: parent.width
                     font.pixelSize: 38
-                    color: "#888888"
+                    color: "black"
+                    wrapMode: TextEdit.Wrap
+                    selectByMouse: false
                 }
             }
 
             Text {
-                id: addDateLabel
                 anchors {
-                    top: addBox.bottom
-                    topMargin: 28
                     left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 48
+                    leftMargin: 20
+                    top: parent.top
+                    topMargin: 20
                 }
-                text: "For " + root.dayLabel(root.addTodoDay)
-                font.pixelSize: 34
-                font.bold: true
-                color: "black"
-                elide: Text.ElideRight
+                visible: addField.text === ""
+                text: "Type the todo text"
+                font.pixelSize: 38
+                color: "#888888"
+            }
+        }
+
+        Text {
+            id: addDateLabel
+            anchors {
+                top: addBox.bottom
+                topMargin: 28
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+            }
+            text: "For " + root.dayLabel(root.addTodoDay)
+            font.pixelSize: 34
+            font.bold: true
+            color: "black"
+            elide: Text.ElideRight
+        }
+
+        // List view: pick the date. Calendar view keeps the active day, so the
+        // grid is hidden there.
+        MonthView {
+            id: addPicker
+            visible: root.viewMode !== "calendar"
+            anchors {
+                top: addDateLabel.bottom
+                topMargin: 16
+                left: parent.left
+                leftMargin: 24
+                right: parent.right
+                rightMargin: 24
+                bottom: addTodoButtons.top
+                bottomMargin: 24
+            }
+            year: root.addPickYear
+            month: root.addPickMonth
+            todayKey: root.todayKey
+            selectedKey: root.addTodoDay
+            onDayClicked: function (key) {
+                root.addTodoDay = key;
+            }
+            onPrevMonth: root.shiftAddMonth(-1)
+            onNextMonth: root.shiftAddMonth(1)
+        }
+
+        Row {
+            id: addTodoButtons
+            anchors {
+                bottom: parent.bottom
+                bottomMargin: 40
+                horizontalCenter: parent.horizontalCenter
+            }
+            spacing: 40
+
+            FlatButton {
+                text: "Cancel"
+                onClicked: root.closeAddTodo()
             }
 
-            // List view: pick the date. Calendar view keeps the active day, so the
-            // grid is hidden there.
-            MonthView {
-                id: addPicker
-                visible: root.viewMode !== "calendar"
-                anchors {
-                    top: addDateLabel.bottom
-                    topMargin: 16
-                    left: parent.left
-                    leftMargin: 24
-                    right: parent.right
-                    rightMargin: 24
-                    bottom: addTodoButtons.top
-                    bottomMargin: 24
-                }
-                year: root.addPickYear
-                month: root.addPickMonth
-                todayKey: root.todayKey
-                selectedKey: root.addTodoDay
-                onDayClicked: function (key) {
-                    root.addTodoDay = key;
-                }
-                onPrevMonth: root.shiftAddMonth(-1)
-                onNextMonth: root.shiftAddMonth(1)
-            }
-
-            Row {
-                id: addTodoButtons
-                anchors {
-                    bottom: parent.bottom
-                    bottomMargin: 40
-                    horizontalCenter: parent.horizontalCenter
-                }
-                spacing: 40
-
-                FlatButton {
-                    text: "Cancel"
-                    onClicked: root.closeAddTodo()
-                }
-
-                FlatButton {
-                    primary: true
-                    enabled: addField.text.trim() !== ""
-                    text: "Add"
-                    onClicked: root.saveAddTodo()
-                }
+            FlatButton {
+                primary: true
+                enabled: addField.text.trim() !== ""
+                text: "Add"
+                onClicked: root.saveAddTodo()
             }
         }
     }
@@ -1702,298 +1646,284 @@ Rectangle {
     // List mode browses/opens the selected day's notes (its main note plus any
     // titled extras); new mode takes a title for a new one. Title entry relies on
     // the device on-screen keyboard appearing when the field gains focus.
-    Rectangle {
+    ModalSheet {
         id: addSheet
-        anchors.fill: parent
-        visible: root.addNoteOpen
-        color: "white"
+        open: root.addNoteOpen
+        cardWidth: 760
+        cardHeight: 820
 
-        // Swallow taps so nothing behind reacts.
-        MouseArea {
-            anchors.fill: parent
+        Text {
+            id: addTitle
+            anchors {
+                top: parent.top
+                topMargin: 40
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 120
+            }
+            text: "Notes for " + root.dayLabel(root.addNoteDay)
+            font.pixelSize: 44
+            font.bold: true
+            color: "black"
+            elide: Text.ElideRight
         }
 
-        Rectangle {
-            anchors.centerIn: parent
-            width: 760
-            height: 820
-            color: "white"
-            border.color: "black"
-            border.width: 4
+        // Dismiss the whole sheet.
+        CloseGlyph {
+            anchors {
+                top: parent.top
+                topMargin: 40
+                right: parent.right
+                rightMargin: 44
+            }
+            onClicked: root.addNoteOpen = false
+        }
+
+        // ---- List mode: the day's notes -----------------------------
+        Item {
+            visible: root.addSheetMode === "list"
+            anchors {
+                top: addTitle.bottom
+                topMargin: 24
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+                bottom: parent.bottom
+                bottomMargin: 180
+            }
 
             Text {
-                id: addTitle
+                id: listHint
                 anchors {
                     top: parent.top
-                    topMargin: 40
                     left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 120
                 }
-                text: "Notes for " + root.dayLabel(root.addNoteDay)
-                font.pixelSize: 44
-                font.bold: true
+                text: existingList.count > 0 ? "Tap a note to open it" : "No notes for this day yet."
+                font.pixelSize: 28
                 color: "black"
-                elide: Text.ElideRight
             }
 
-            // Dismiss the whole sheet.
-            CloseGlyph {
+            ListView {
+                id: existingList
                 anchors {
-                    top: parent.top
-                    topMargin: 40
-                    right: parent.right
-                    rightMargin: 44
-                }
-                onClicked: root.addNoteOpen = false
-            }
-
-            // ---- List mode: the day's notes -----------------------------
-            Item {
-                visible: root.addSheetMode === "list"
-                anchors {
-                    top: addTitle.bottom
-                    topMargin: 24
+                    top: listHint.bottom
+                    topMargin: 16
                     left: parent.left
-                    leftMargin: 48
                     right: parent.right
-                    rightMargin: 48
                     bottom: parent.bottom
-                    bottomMargin: 180
                 }
-
-                Text {
-                    id: listHint
-                    anchors {
-                        top: parent.top
-                        left: parent.left
-                    }
-                    text: existingList.count > 0 ? "Tap a note to open it" : "No notes for this day yet."
-                    font.pixelSize: 28
-                    color: "black"
-                }
-
-                ListView {
-                    id: existingList
-                    anchors {
-                        top: listHint.bottom
-                        topMargin: 16
-                        left: parent.left
-                        right: parent.right
-                        bottom: parent.bottom
-                    }
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    spacing: 12
-                    model: root.dayNotes(root.addNoteDay)
-                    delegate: Rectangle {
-                        id: noteRow
-                        required property var modelData
-                        width: existingList.width
-                        height: 76
-                        color: "white"
-                        border.color: "black"
-                        border.width: 2
-
-                        Text {
-                            anchors {
-                                left: parent.left
-                                leftMargin: 20
-                                right: removeBtn.left
-                                rightMargin: 12
-                                verticalCenter: parent.verticalCenter
-                            }
-                            text: noteRow.modelData.label
-                            font.pixelSize: 32
-                            font.bold: noteRow.modelData.kind === "day"
-                            color: "black"
-                            elide: Text.ElideRight
-                        }
-
-                        // Open the note (whole row except the remove button).
-                        MouseArea {
-                            anchors {
-                                left: parent.left
-                                top: parent.top
-                                bottom: parent.bottom
-                                right: removeBtn.left
-                            }
-                            onClicked: {
-                                if (noteRow.modelData.kind === "day")
-                                    root.openDayNote(root.addNoteDay);
-                                else
-                                    root.openExtraNote(root.addNoteDay, noteRow.modelData.title);
-                            }
-                        }
-
-                        // Forget a hand-deleted note (local record only).
-                        Item {
-                            id: removeBtn
-                            width: 76
-                            anchors {
-                                top: parent.top
-                                bottom: parent.bottom
-                                right: parent.right
-                            }
-                            Rectangle {
-                                anchors {
-                                    left: parent.left
-                                    top: parent.top
-                                    topMargin: 14
-                                    bottomMargin: 14
-                                }
-                                width: 2
-                                height: parent.height - 28
-                                color: "black"
-                            }
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 30
-                                height: 5
-                                radius: 2
-                                color: "black"
-                                rotation: 45
-                            }
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 30
-                                height: 5
-                                radius: 2
-                                color: "black"
-                                rotation: -45
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    if (noteRow.modelData.kind === "day")
-                                        root.askForget("day", "", noteRow.modelData.label);
-                                    else
-                                        root.askForget("extra", noteRow.modelData.title, noteRow.modelData.label);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // List-mode actions: start a new titled note, or open the day's main note.
-            Row {
-                visible: root.addSheetMode === "list"
-                anchors {
-                    bottom: parent.bottom
-                    bottomMargin: 40
-                    horizontalCenter: parent.horizontalCenter
-                }
-                spacing: 40
-
-                FlatButton {
-                    width: 300
-                    fontSize: 38
-                    text: "+ New note"
-                    onClicked: {
-                        root.addSheetMode = "new";
-                        titleField.text = "";
-                        titleField.forceActiveFocus();
-                    }
-                }
-
-                FlatButton {
-                    width: 300
-                    fontSize: 38
-                    primary: true
-                    text: root.addNoteDay === root.todayKey ? "Today's note" : "Day's note"
-                    onClicked: root.openDayNote(root.addNoteDay)
-                }
-            }
-
-            // ---- New mode: title entry ----------------------------------
-            Item {
-                visible: root.addSheetMode === "new"
-                anchors {
-                    top: addTitle.bottom
-                    topMargin: 24
-                    left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 48
-                    bottom: parent.bottom
-                    bottomMargin: 180
-                }
-
-                Text {
-                    id: inputLabel
-                    anchors {
-                        top: parent.top
-                        left: parent.left
-                    }
-                    text: "New note title"
-                    font.pixelSize: 28
-                    color: "black"
-                }
-
-                Rectangle {
-                    id: inputBox
-                    anchors {
-                        top: inputLabel.bottom
-                        topMargin: 16
-                        left: parent.left
-                        right: parent.right
-                    }
-                    height: 92
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                spacing: 12
+                model: root.dayNotes(root.addNoteDay)
+                delegate: Rectangle {
+                    id: noteRow
+                    required property var modelData
+                    width: existingList.width
+                    height: 76
                     color: "white"
                     border.color: "black"
-                    border.width: 3
-
-                    TextInput {
-                        id: titleField
-                        anchors {
-                            fill: parent
-                            leftMargin: 20
-                            rightMargin: 20
-                        }
-                        font.pixelSize: 38
-                        color: "black"
-                        clip: true
-                        verticalAlignment: TextInput.AlignVCenter
-                        onAccepted: root.createExtraNote(root.addNoteDay, titleField.text)
-                    }
+                    border.width: 2
 
                     Text {
                         anchors {
                             left: parent.left
                             leftMargin: 20
+                            right: removeBtn.left
+                            rightMargin: 12
                             verticalCenter: parent.verticalCenter
                         }
-                        visible: titleField.text === ""
-                        text: "e.g. Standup, 1:1 with Alex"
-                        font.pixelSize: 38
-                        color: "#888888"
+                        text: noteRow.modelData.label
+                        font.pixelSize: 32
+                        font.bold: noteRow.modelData.kind === "day"
+                        color: "black"
+                        elide: Text.ElideRight
+                    }
+
+                    // Open the note (whole row except the remove button).
+                    MouseArea {
+                        anchors {
+                            left: parent.left
+                            top: parent.top
+                            bottom: parent.bottom
+                            right: removeBtn.left
+                        }
+                        onClicked: {
+                            if (noteRow.modelData.kind === "day")
+                                root.openDayNote(root.addNoteDay);
+                            else
+                                root.openExtraNote(root.addNoteDay, noteRow.modelData.title);
+                        }
+                    }
+
+                    // Forget a hand-deleted note (local record only).
+                    Item {
+                        id: removeBtn
+                        width: 76
+                        anchors {
+                            top: parent.top
+                            bottom: parent.bottom
+                            right: parent.right
+                        }
+                        Rectangle {
+                            anchors {
+                                left: parent.left
+                                top: parent.top
+                                topMargin: 14
+                                bottomMargin: 14
+                            }
+                            width: 2
+                            height: parent.height - 28
+                            color: "black"
+                        }
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 30
+                            height: 5
+                            radius: 2
+                            color: "black"
+                            rotation: 45
+                        }
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: 30
+                            height: 5
+                            radius: 2
+                            color: "black"
+                            rotation: -45
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: {
+                                if (noteRow.modelData.kind === "day")
+                                    root.askForget("day", "", noteRow.modelData.label);
+                                else
+                                    root.askForget("extra", noteRow.modelData.title, noteRow.modelData.label);
+                            }
+                        }
                     }
                 }
             }
+        }
 
-            // New-mode actions: back to the list, or create the titled note.
-            Row {
-                visible: root.addSheetMode === "new"
+        // List-mode actions: start a new titled note, or open the day's main note.
+        Row {
+            visible: root.addSheetMode === "list"
+            anchors {
+                bottom: parent.bottom
+                bottomMargin: 40
+                horizontalCenter: parent.horizontalCenter
+            }
+            spacing: 40
+
+            FlatButton {
+                width: 300
+                fontSize: 38
+                text: "+ New note"
+                onClicked: {
+                    root.addSheetMode = "new";
+                    titleField.text = "";
+                    titleField.forceActiveFocus();
+                }
+            }
+
+            FlatButton {
+                width: 300
+                fontSize: 38
+                primary: true
+                text: root.addNoteDay === root.todayKey ? "Today's note" : "Day's note"
+                onClicked: root.openDayNote(root.addNoteDay)
+            }
+        }
+
+        // ---- New mode: title entry ----------------------------------
+        Item {
+            visible: root.addSheetMode === "new"
+            anchors {
+                top: addTitle.bottom
+                topMargin: 24
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+                bottom: parent.bottom
+                bottomMargin: 180
+            }
+
+            Text {
+                id: inputLabel
                 anchors {
-                    bottom: parent.bottom
-                    bottomMargin: 40
-                    horizontalCenter: parent.horizontalCenter
+                    top: parent.top
+                    left: parent.left
                 }
-                spacing: 40
+                text: "New note title"
+                font.pixelSize: 28
+                color: "black"
+            }
 
-                FlatButton {
-                    text: "Back"
-                    onClicked: root.addSheetMode = "list"
+            Rectangle {
+                id: inputBox
+                anchors {
+                    top: inputLabel.bottom
+                    topMargin: 16
+                    left: parent.left
+                    right: parent.right
+                }
+                height: 92
+                color: "white"
+                border.color: "black"
+                border.width: 3
+
+                TextInput {
+                    id: titleField
+                    anchors {
+                        fill: parent
+                        leftMargin: 20
+                        rightMargin: 20
+                    }
+                    font.pixelSize: 38
+                    color: "black"
+                    clip: true
+                    verticalAlignment: TextInput.AlignVCenter
+                    onAccepted: root.createExtraNote(root.addNoteDay, titleField.text)
                 }
 
-                FlatButton {
-                    primary: true
-                    enabled: titleField.text.trim() !== ""
-                    text: "Create"
-                    onClicked: root.createExtraNote(root.addNoteDay, titleField.text)
+                Text {
+                    anchors {
+                        left: parent.left
+                        leftMargin: 20
+                        verticalCenter: parent.verticalCenter
+                    }
+                    visible: titleField.text === ""
+                    text: "e.g. Standup, 1:1 with Alex"
+                    font.pixelSize: 38
+                    color: "#888888"
                 }
+            }
+        }
+
+        // New-mode actions: back to the list, or create the titled note.
+        Row {
+            visible: root.addSheetMode === "new"
+            anchors {
+                bottom: parent.bottom
+                bottomMargin: 40
+                horizontalCenter: parent.horizontalCenter
+            }
+            spacing: 40
+
+            FlatButton {
+                text: "Back"
+                onClicked: root.addSheetMode = "list"
+            }
+
+            FlatButton {
+                primary: true
+                enabled: titleField.text.trim() !== ""
+                text: "Create"
+                onClicked: root.createExtraNote(root.addNoteDay, titleField.text)
             }
         }
     }
@@ -2001,91 +1931,77 @@ Rectangle {
     // --- Forget-note confirmation ----------------------------------------
     // Removing a row only drops reTasker's local record; the notebook (if it
     // still exists) is untouched. Stacks above the day-notes sheet.
-    Rectangle {
+    ModalSheet {
         id: forgetConfirm
-        anchors.fill: parent
-        visible: root.pendingForgetKind !== ""
-        color: "white"
+        open: root.pendingForgetKind !== ""
+        cardWidth: 720
+        cardHeight: 520
 
-        // Swallow taps so nothing behind the modal reacts.
-        MouseArea {
-            anchors.fill: parent
+        Text {
+            id: forgetTitle
+            anchors {
+                top: parent.top
+                topMargin: 48
+                horizontalCenter: parent.horizontalCenter
+            }
+            text: "Remove from list?"
+            font.pixelSize: 46
+            font.bold: true
+            color: "black"
         }
 
-        Rectangle {
-            anchors.centerIn: parent
-            width: 720
-            height: 520
-            color: "white"
-            border.color: "black"
-            border.width: 4
+        Text {
+            id: forgetName
+            anchors {
+                top: forgetTitle.bottom
+                topMargin: 36
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+            }
+            text: root.pendingForgetLabel
+            font.pixelSize: 40
+            color: "black"
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+            maximumLineCount: 2
+            elide: Text.ElideRight
+        }
 
-            Text {
-                id: forgetTitle
-                anchors {
-                    top: parent.top
-                    topMargin: 48
-                    horizontalCenter: parent.horizontalCenter
-                }
-                text: "Remove from list?"
-                font.pixelSize: 46
-                font.bold: true
-                color: "black"
+        Text {
+            anchors {
+                top: forgetName.bottom
+                topMargin: 28
+                left: parent.left
+                leftMargin: 48
+                right: parent.right
+                rightMargin: 48
+            }
+            text: "This only removes it from reTasker. The notebook itself is not deleted."
+            font.pixelSize: 28
+            color: "black"
+            horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.WordWrap
+        }
+
+        Row {
+            anchors {
+                bottom: parent.bottom
+                bottomMargin: 48
+                horizontalCenter: parent.horizontalCenter
+            }
+            spacing: 40
+
+            FlatButton {
+                text: "Cancel"
+                onClicked: root.pendingForgetKind = ""
             }
 
-            Text {
-                id: forgetName
-                anchors {
-                    top: forgetTitle.bottom
-                    topMargin: 36
-                    left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 48
-                }
-                text: root.pendingForgetLabel
-                font.pixelSize: 40
-                color: "black"
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-                maximumLineCount: 2
-                elide: Text.ElideRight
-            }
-
-            Text {
-                anchors {
-                    top: forgetName.bottom
-                    topMargin: 28
-                    left: parent.left
-                    leftMargin: 48
-                    right: parent.right
-                    rightMargin: 48
-                }
-                text: "This only removes it from reTasker. The notebook itself is not deleted."
-                font.pixelSize: 28
-                color: "black"
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-            }
-
-            Row {
-                anchors {
-                    bottom: parent.bottom
-                    bottomMargin: 48
-                    horizontalCenter: parent.horizontalCenter
-                }
-                spacing: 40
-
-                FlatButton {
-                    text: "Cancel"
-                    onClicked: root.pendingForgetKind = ""
-                }
-
-                FlatButton {
-                    primary: true
-                    text: "Remove"
-                    onClicked: root.confirmForget()
-                }
+            FlatButton {
+                primary: true
+                text: "Remove"
+                onClicked: root.confirmForget()
             }
         }
     }
