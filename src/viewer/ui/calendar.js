@@ -9,17 +9,17 @@ function dateKey(d) {
     return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
 }
 
-// Count todos and how many are done, per day. Mirrors the list's done-state
-// (keyed by base in doneMap) so a day's marker matches what you'd see inside it.
-function buildIndex(entries, doneMap) {
+// Count todos and how many are done, per day, from the backend's calendar rows
+// ({ts, done} for the shown month). Bucketing happens here, in local time, so
+// the backend stays timezone-agnostic.
+function buildIndex(rows) {
     var idx = {};
-    for (var i = 0; i < entries.length; i++) {
-        var e = entries[i];
-        var k = dateKey(e.mtime);
+    for (var i = 0; i < rows.length; i++) {
+        var k = dateKey(new Date(rows[i].ts));
         if (!idx[k])
             idx[k] = { total: 0, done: 0 };
         idx[k].total += 1;
-        if (doneMap[e.base] === true)
+        if (rows[i].done === 1 || rows[i].done === true)
             idx[k].done += 1;
     }
     return idx;

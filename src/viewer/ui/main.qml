@@ -2,17 +2,20 @@ import QtQuick
 import Qt.labs.folderlistmodel
 import Qt.labs.settings
 import net.asivery.XoviMessageBroker 2.0
+import net.asivery.AppLoad 1.0
 import "store.js" as Store
 import "ocr.js" as Ocr
 import "calendar.js" as Cal
 
-// reTasker viewer — a frontend-only AppLoad app.
+// reTasker viewer — an AppLoad app backed by retasker-backend.
 //
-// Todos ARE the PNG snippets the capture extension drops into capturesDir; the
-// list is just that folder, newest-first. Done-state is the viewer's own
-// concern and lives in Qt.labs.settings (a filename -> bool map). No SQLite:
-// this Qt build ships neither QtQuick.LocalStorage nor a way to share a DB file
-// with the C writer, and the folder already is the source of truth.
+// Todos live in a SQLite database owned by the backend process (this Qt build
+// ships no SQLite, so the viewer can't open one itself — it talks to the backend
+// over AppLoad). The viewer asks for a page of todos and renders it; the backend
+// does the sorting, filtering and calendar bucketing. The PNG snippets the
+// capture extension drops into capturesDir are the only files left on disk: the
+// viewer ingests each new one into the DB and, once OCR transcribes it, the
+// backend stores the text and deletes the PNG, so the folder stays small.
 //
 // Styled for e-ink: pure black on white, no animation, large tap targets.
 Rectangle {
@@ -29,7 +32,6 @@ Rectangle {
     readonly property string appDir: "file:///home/root/xovi/exthome/appload/retasker"
     readonly property string capturesDir: appDir + "/captures"
     property string filter: "todo"          // "todo" | "done" | "all"
-    property var doneMap: ({})
 
     // Calendar: viewMode switches the body between the flat list and the month
     // grid. selectedDay (a "y-m-d" key) is set when a day is tapped in the grid,
@@ -93,10 +95,28 @@ Rectangle {
     property var ocrConfig: null
     property var ocrTried: ({})
 
+    // Backend (retasker-backend, an AppLoad process owning the SQLite DB). The
+    // viewer only loads once the backend signals READY — messages sent before its
+    // socket is registered are dropped. Todos are fetched one page at a time.
+    property bool backendReady: false
+    property int pageSize: 200
+    property int loadedOffset: 0
+    property bool moreAvailable: false
+    property var ingested: ({})          // PNG bases ingested this session
+    readonly property int msgQuery: 1
+    readonly property int msgSetDone: 2
+    readonly property int msgSetText: 3
+    readonly property int msgDelete: 4
+    readonly property int msgIngest: 5
+    readonly property int msgCal: 6
+    readonly property int msgReady: 100
+    readonly property int msgRows: 101
+    readonly property int msgIngested: 102
+    readonly property int msgCalRows: 103
+
     Settings {
         id: settings
         category: "retasker"
-        property string doneJson: "{}"
         property string notesJson: "{}"     // day -> [titles] of extra notes
         property string dayNotesJson: "{}"  // day -> true if its main note exists
         property string viewMode: "list"    // remembered across sessions
@@ -111,14 +131,23 @@ Rectangle {
         id: broker
     }
 
+    // Todo database, owned by retasker-backend over AppLoad.
+    AppLoad {
+        id: backend
+        applicationID: "retasker"
+        onMessageReceived: (type, contents) => root.onBackendMessage(type, contents)
+    }
+
+    // Only un-transcribed PNGs live on disk now; this drives ingestion + OCR of
+    // new captures. The displayed list comes from the backend, not this folder.
     FolderListModel {
         id: folder
         folder: root.capturesDir
         showDirs: false
         showFiles: true
-        nameFilters: ["*.png", "*.txt"]
+        nameFilters: ["*.png"]
         onStatusChanged: if (folder.status === FolderListModel.Ready)
-            root.refresh()
+            root.syncFolder()
     }
 
     ListModel {
@@ -126,11 +155,6 @@ Rectangle {
     }
 
     function refresh() {
-        try {
-            root.doneMap = JSON.parse(settings.doneJson);
-        } catch (e) {
-            root.doneMap = {};
-        }
         try {
             root.notesMap = JSON.parse(settings.notesJson);
         } catch (e) {
@@ -141,75 +165,158 @@ Rectangle {
         } catch (e) {
             root.dayNoteMap = {};
         }
-        var entries = Store.collect(folder);
-        root.dayIndex = Cal.buildIndex(entries, root.doneMap);
-        // Calendar view shows every todo (done included); the status filter is a
-        // list-view concern. Then scope to the selected day, or the shown month.
-        var effFilter = root.viewMode === "calendar" ? "all" : root.filter;
-        var visible = Store.view(entries, root.doneMap, effFilter);
-        if (root.viewMode === "calendar") {
-            if (root.selectedDay !== "")
-                visible = visible.filter(function (v) {
-                    return Cal.dateKey(v.mtime) === root.selectedDay;
-                });
-            else
-                visible = visible.filter(function (v) {
-                    return v.mtime.getFullYear() === root.shownYear && v.mtime.getMonth() === root.shownMonth;
-                });
-        }
-        rows.clear();
-        for (var i = 0; i < visible.length; i++) {
-            var v = visible[i];
-            rows.append({
-                base: v.base,
-                name: v.name,
-                kind: v.kind,
-                url: v.url,
-                text: "",
-                done: v.done,
-                dateText: Qt.formatDateTime(v.mtime, "d MMM HH:mm")
-            });
-            if (v.kind === "text")
-                root.loadText(v.base, v.url);
-        }
-        root.runOcr(entries);
+        if (!root.backendReady)
+            return;  // the first load is driven by the backend's READY signal
+        root.queryPage(0);
+        if (root.viewMode === "calendar")
+            root.requestCal();
     }
 
-    // Transcribe every not-yet-tried image capture in the background. On
-    // success the native side writes the .txt and drops the .png.
-    function runOcr(entries) {
-        if (!root.ocrConfig)
-            return;
-        for (var i = 0; i < entries.length; i++)
-            maybeTranscribe(entries[i]);
+    // Request a page of todos: the status filter (list view) and, in calendar
+    // view, the [start, end) capture-time window of the selected day or the shown
+    // month. Newest-first ordering and paging happen in the backend.
+    function queryPage(offset) {
+        var req = {
+            filter: root.viewMode === "calendar" ? "all" : root.filter,
+            offset: offset,
+            limit: root.pageSize
+        };
+        var range = root.viewRange();
+        if (range) {
+            req.rangeStart = range.start;
+            req.rangeEnd = range.end;
+        }
+        backend.sendMessage(root.msgQuery, JSON.stringify(req));
     }
 
-    function maybeTranscribe(entry) {
-        if (entry.kind !== "image" || root.ocrTried[entry.base])
+    // The capture-time window the calendar is scoped to: one day if selected,
+    // otherwise the whole shown month. null in list view (no window).
+    function viewRange() {
+        if (root.viewMode !== "calendar")
+            return null;
+        if (root.selectedDay !== "") {
+            var p = root.selectedDay.split("-");
+            var d0 = new Date(p[0], p[1] - 1, p[2]);
+            var d1 = new Date(p[0], p[1] - 1, parseInt(p[2], 10) + 1);
+            return {
+                start: d0.getTime(),
+                end: d1.getTime()
+            };
+        }
+        return {
+            start: new Date(root.shownYear, root.shownMonth, 1).getTime(),
+            end: new Date(root.shownYear, root.shownMonth + 1, 1).getTime()
+        };
+    }
+
+    // Ask for the shown month's {ts,done} rows so the grid can mark each day
+    // (the whole month, regardless of which day is selected).
+    function requestCal() {
+        backend.sendMessage(root.msgCal, JSON.stringify({
+            rangeStart: new Date(root.shownYear, root.shownMonth, 1).getTime(),
+            rangeEnd: new Date(root.shownYear, root.shownMonth + 1, 1).getTime()
+        }));
+    }
+
+    // Load the next page once the list is scrolled near its end.
+    function loadMore() {
+        if (!root.moreAvailable)
             return;
-        root.ocrTried[entry.base] = true;
-        var base = entry.base;
-        var png = entry.name;
-        Ocr.transcribe(entry.url, root.ocrConfig, function (text) {
+        root.moreAvailable = false;  // guard until the page arrives
+        root.queryPage(root.loadedOffset);
+    }
+
+    function onBackendMessage(type, contents) {
+        if (type === root.msgReady) {
+            root.backendReady = true;
+            root.syncFolder();  // ingest captures the folder already listed
+            root.refresh();
+            return;
+        }
+        var data = JSON.parse(contents);
+        if (type === root.msgRows) {
+            if (data.offset === 0)
+                rows.clear();
+            var list = data.rows || [];
+            for (var i = 0; i < list.length; i++)
+                root.appendRow(list[i]);
+            root.loadedOffset = data.offset + list.length;
+            root.moreAvailable = list.length === root.pageSize;
+        } else if (type === root.msgCalRows) {
+            root.dayIndex = Cal.buildIndex(data.rows || []);
+        } else if (type === root.msgIngested) {
+            if ((data.new || 0) > 0)
+                root.refresh();  // new todos landed: re-query the current view
+        }
+    }
+
+    // Turn a backend todo row into a list-model entry. An image row (awaiting
+    // OCR) points at its PNG; a text row carries its transcription.
+    function appendRow(r) {
+        var image = r.hasImage === 1 || r.hasImage === true;
+        rows.append({
+            base: r.base,
+            name: r.base + (image ? ".png" : ".txt"),
+            kind: image ? "image" : "text",
+            text: r.text ? r.text : "",
+            url: root.capturesDir + "/" + r.base + ".png",
+            done: r.done === 1 || r.done === true,
+            dateText: Qt.formatDateTime(new Date(r.ts), "d MMM HH:mm")
+        });
+    }
+
+    // Ingest every capture the folder lists into the DB (the backend ignores
+    // ones it already has) and OCR any not transcribed yet. This is the only use
+    // of the folder model — the displayed list comes from the backend.
+    function syncFolder() {
+        if (!root.backendReady)
+            return;  // re-run on READY; sending now would be dropped, and an OCR
+        // result returning before then would be lost with it
+        var items = [];
+        for (var i = 0; i < folder.count; i++) {
+            var fn = "" + folder.get(i, "fileName");
+            var m = /^(cap-\d+-\d+)\.png$/i.exec(fn);
+            if (!m)
+                continue;
+            var base = m[1];
+            if (!root.ingested[base]) {
+                root.ingested[base] = true;
+                items.push({
+                    base: base,
+                    ts: Store.captureMs(base)
+                });
+            }
+            root.maybeTranscribe(base, "" + folder.get(i, "fileURL"));
+        }
+        if (items.length > 0)
+            backend.sendMessage(root.msgIngest, JSON.stringify({
+                items: items
+            }));
+    }
+
+    function maybeTranscribe(base, url) {
+        if (!root.ocrConfig || root.ocrTried[base])
+            return;
+        root.ocrTried[base] = true;
+        Ocr.transcribe(url, root.ocrConfig, function (text) {
             if (!text)
                 return;  // offline or unreadable: keep the image
-            // "<file> <percent-encoded text>": keeps the payload single-line so
-            // it survives the broker, and round-trips newlines/accents as UTF-8.
-            broker.sendSimpleSignal("retasker.transcribe", png + " " + encodeURIComponent(text));
+            backend.sendMessage(root.msgSetText, JSON.stringify({
+                base: base,
+                text: text
+            }));
             root.applyTranscription(base, text);
         });
     }
 
-    // Swap a row from image to text in place. The native side has just written
-    // the .txt and removed the .png; updating the row directly avoids waiting on
-    // the folder model to notice (the file count is unchanged, so it may not).
+    // Swap a row from image to text in place once its transcription is stored,
+    // so the change shows without waiting on a re-query.
     function applyTranscription(base, text) {
         for (var i = 0; i < rows.count; i++) {
             if (rows.get(i).base === base) {
                 rows.setProperty(i, "kind", "text");
                 rows.setProperty(i, "text", text);
                 rows.setProperty(i, "name", base + ".txt");
-                rows.setProperty(i, "url", root.capturesDir + "/" + base + ".txt");
                 return;
             }
         }
@@ -227,35 +334,29 @@ Rectangle {
                 root.ocrConfig = null;
             }
             if (root.ocrConfig)
-                root.runOcr(Store.collect(folder));
+                root.syncFolder();
         };
         xhr.send();
-    }
-
-    // Read a transcription file and drop it into its row (async; tiny file).
-    function loadText(base, url) {
-        var xhr = new XMLHttpRequest();
-        xhr.open("GET", url);
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === XMLHttpRequest.DONE)
-                root.setRowText(base, (xhr.responseText || "").trim());
-        };
-        xhr.send();
-    }
-
-    function setRowText(base, text) {
-        for (var i = 0; i < rows.count; i++) {
-            if (rows.get(i).base === base) {
-                rows.setProperty(i, "text", text);
-                return;
-            }
-        }
     }
 
     function toggle(base) {
-        root.doneMap[base] = !root.doneMap[base];
-        settings.doneJson = JSON.stringify(root.doneMap);
-        refresh();
+        for (var i = 0; i < rows.count; i++) {
+            if (rows.get(i).base === base) {
+                var done = !rows.get(i).done;
+                rows.setProperty(i, "done", done);
+                backend.sendMessage(root.msgSetDone, JSON.stringify({
+                    base: base,
+                    done: done
+                }));
+                break;
+            }
+        }
+        // Re-scope the view to match: a status-filtered list drops the row, and
+        // the calendar's per-day counts change.
+        if (root.viewMode === "calendar")
+            root.requestCal();
+        else if (root.filter !== "all")
+            root.refresh();
     }
 
     function askDelete(name) {
@@ -276,15 +377,15 @@ Rectangle {
         root.pendingDelete = "";
         if (!name)
             return;
-        broker.sendSimpleSignal("retasker.delete", name);
-        var base = name.replace(/\.(png|txt)$/i, "");
-        if (root.doneMap[base] !== undefined) {
-            delete root.doneMap[base];
-            settings.doneJson = JSON.stringify(root.doneMap);
-        }
         for (var i = 0; i < rows.count; i++) {
             if (rows.get(i).name === name) {
+                var base = rows.get(i).base;
                 rows.remove(i);
+                backend.sendMessage(root.msgDelete, JSON.stringify({
+                    base: base
+                }));
+                if (root.viewMode === "calendar")
+                    root.requestCal();
                 break;
             }
         }
@@ -320,16 +421,17 @@ Rectangle {
         root.askDelete(name);
     }
 
-    // Save an edited todo. Reuses the transcribe write path: the native side
-    // writes <base>.txt and (for an image todo) drops the .png, so editing an
-    // untranscribed image doubles as a manual transcription. <base>.png is the
-    // payload name the handler expects even when the .png is already gone — the
-    // remove is then a harmless no-op.
+    // Save an edited todo: store the text in the DB. The backend drops the .png
+    // if it was still an image, so editing an untranscribed capture doubles as a
+    // manual transcription.
     function saveEdit() {
         var text = editField.text.trim();
         if (text === "")
             return;
-        broker.sendSimpleSignal("retasker.transcribe", root.editBase + ".png " + encodeURIComponent(text));
+        backend.sendMessage(root.msgSetText, JSON.stringify({
+            base: root.editBase,
+            text: text
+        }));
         root.applyTranscription(root.editBase, text);
         root.closeEdit();
     }
@@ -927,6 +1029,10 @@ Rectangle {
         cacheBuffer: 0
         highlightMoveDuration: 0
         boundsBehavior: Flickable.StopAtBounds
+
+        // Pull the next page from the backend as the end comes into view.
+        onContentYChanged: if (root.moreAvailable && contentY + height >= contentHeight - 400)
+            root.loadMore()
 
         delegate: TodoDelegate {
             width: list.width
