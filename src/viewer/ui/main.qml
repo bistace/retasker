@@ -92,8 +92,13 @@ Rectangle {
     // OCR (config loaded from appDir/config.json; null disables transcription).
     // ocrTried guards against re-submitting the same capture within a session;
     // reopening the app retries anything still left as an image (e.g. offline).
+    // Transcriptions run through a bounded queue so a burst of captures can't
+    // fire hundreds of concurrent requests at the provider.
     property var ocrConfig: null
     property var ocrTried: ({})
+    property var ocrQueue: []     // {base, url} jobs waiting for a slot
+    property int ocrInFlight: 0
+    readonly property int ocrMax: 3
 
     // Backend (retasker-backend, an AppLoad process owning the SQLite DB). The
     // viewer only loads once the backend signals READY — messages sent before its
@@ -294,18 +299,41 @@ Rectangle {
             }));
     }
 
+    // Queue a capture for transcription (deduped per session by ocrTried) and
+    // start it if a slot is free.
     function maybeTranscribe(base, url) {
         if (!root.ocrConfig || root.ocrTried[base])
             return;
         root.ocrTried[base] = true;
+        root.ocrQueue.push({
+            base: base,
+            url: url
+        });
+        root.pumpOcr();
+    }
+
+    // Keep up to ocrMax transcriptions in flight; each completion frees a slot
+    // and pulls the next job.
+    function pumpOcr() {
+        while (root.ocrInFlight < root.ocrMax && root.ocrQueue.length > 0) {
+            var job = root.ocrQueue.shift();
+            root.ocrInFlight += 1;
+            root.transcribeJob(job.base, job.url);
+        }
+    }
+
+    function transcribeJob(base, url) {
         Ocr.transcribe(url, root.ocrConfig, function (text) {
-            if (!text)
-                return;  // offline or unreadable: keep the image
-            backend.sendMessage(root.msgSetText, JSON.stringify({
-                base: base,
-                text: text
-            }));
-            root.applyTranscription(base, text);
+            root.ocrInFlight -= 1;
+            if (text) {
+                // offline/unreadable returns null: keep the image and move on
+                backend.sendMessage(root.msgSetText, JSON.stringify({
+                    base: base,
+                    text: text
+                }));
+                root.applyTranscription(base, text);
+            }
+            root.pumpOcr();
         });
     }
 
