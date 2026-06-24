@@ -35,6 +35,7 @@
 #define MSG_DELETE 4
 #define MSG_INGEST 5
 #define MSG_CAL 6
+#define MSG_ADD 7
 // Reply types (backend -> viewer).
 #define MSG_READY 100
 #define MSG_ROWS 101
@@ -204,6 +205,15 @@ static void dispatch(int fd, int32_t type, const char *json) {
         break;
     case MSG_CAL:
         handle_cal(fd, json);
+        break;
+    case MSG_ADD:
+        // A todo typed in the viewer (no capture): a text row, dated to the day
+        // the user chose. base is the viewer's unique key, so OR IGNORE makes a
+        // stray resend a no-op.
+        exec_with_json("INSERT OR IGNORE INTO todos(base,ts,text,has_image,done) "
+                       "VALUES(json_extract(?1,'$.base'),json_extract(?1,'$.ts'),"
+                       "json_extract(?1,'$.text'),0,0)",
+                       json);
         break;
     }
 }
