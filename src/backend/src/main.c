@@ -66,7 +66,11 @@ static void send_msg(int fd, int32_t type, const char *body) {
 // Copy the string value of a top-level JSON "key":"value" into out. Minimal:
 // quoted string values only, handles a backslash-escaped char. Returns 1 if
 // found. Used solely to pull a todo's base name for file removal.
-static int json_get_string(const char *json, const char *key, char *out, size_t outsize) {
+//
+// Intentionally byte-identical to json_str() in src/capture/src/main.c: the two
+// modules build in isolation (each Makefile is run on its own copied subtree), so
+// there is no shared header to lift this into. Keep the two copies in sync.
+static int json_str(const char *json, const char *key, char *out, size_t outsize) {
     char pat[64];
     snprintf(pat, sizeof(pat), "\"%s\"", key);
     const char *p = strstr(json, pat);
@@ -91,7 +95,7 @@ static int json_get_string(const char *json, const char *key, char *out, size_t 
 // our own DB, but reject a '/' anyway so a bad row can't escape the dir.
 static void remove_png(const char *json) {
     char base[256];
-    if (!json_get_string(json, "base", base, sizeof(base))) return;
+    if (!json_str(json, "base", base, sizeof(base))) return;
     if (strchr(base, '/') != NULL) return;
     char path[512];
     snprintf(path, sizeof(path), "%s/%s.png", CAPTURE_DIR, base);

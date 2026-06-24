@@ -187,6 +187,10 @@ char *captureHandler(const char *value) {
 
 // Copy the string value of a top-level JSON "key":"value" into out. Minimal: only
 // quoted string values, handles a backslash-escaped char. Returns 1 if found.
+//
+// Intentionally byte-identical to json_str() in src/backend/src/main.c: the two
+// modules build in isolation (each Makefile is run on its own copied subtree), so
+// there is no shared header to lift this into. Keep the two copies in sync.
 static int json_str(const char *json, const char *key, char *out, size_t outsize) {
     char pat[64];
     snprintf(pat, sizeof(pat), "\"%s\"", key);
