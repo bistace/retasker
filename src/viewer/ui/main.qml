@@ -1036,7 +1036,7 @@ Rectangle {
         // the day's main note. The sheet's actions go through the native bridge,
         // which creates/opens the real notebook; closing the viewer drops the
         // user into it.
-        Rectangle {
+        FlatButton {
             id: notesBtn
             anchors {
                 right: parent.right
@@ -1045,20 +1045,13 @@ Rectangle {
             }
             width: 240
             height: 60
-            color: "black"
-            Text {
-                anchors.centerIn: parent
-                text: "Notes"
-                font.pixelSize: 30
-                color: "white"
-            }
-            MouseArea {
-                anchors.fill: parent
-                onClicked: {
-                    root.addNoteDay = root.activeDay();
-                    root.addSheetMode = "list";
-                    root.addNoteOpen = true;
-                }
+            fontSize: 30
+            primary: true
+            text: "Notes"
+            onClicked: {
+                root.addNoteDay = root.activeDay();
+                root.addSheetMode = "list";
+                root.addNoteOpen = true;
             }
         }
 
@@ -1198,40 +1191,21 @@ Rectangle {
                     }
                     spacing: 20
 
-                    Rectangle {
+                    FlatButton {
                         width: 170
                         height: 76
-                        color: "white"
-                        border.color: "black"
-                        border.width: 3
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Reset"
-                            font.pixelSize: 32
-                            color: "black"
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.resetDefaultTemplate()
-                        }
+                        fontSize: 32
+                        text: "Reset"
+                        onClicked: root.resetDefaultTemplate()
                     }
 
-                    Rectangle {
+                    FlatButton {
                         width: 190
                         height: 76
-                        color: "black"
-                        border.color: "black"
-                        border.width: 3
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Choose"
-                            font.pixelSize: 32
-                            color: "white"
-                        }
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.chooseDefaultTemplate()
-                        }
+                        fontSize: 32
+                        primary: true
+                        text: "Choose"
+                        onClicked: root.chooseDefaultTemplate()
                     }
                 }
 
@@ -1346,40 +1320,15 @@ Rectangle {
                 }
                 spacing: 40
 
-                Rectangle {
-                    width: 260
-                    height: 100
-                    color: "white"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        font.pixelSize: 40
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.pendingDelete = ""
-                    }
+                FlatButton {
+                    text: "Cancel"
+                    onClicked: root.pendingDelete = ""
                 }
 
-                Rectangle {
-                    width: 260
-                    height: 100
-                    color: "black"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Delete"
-                        font.pixelSize: 40
-                        color: "white"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.confirmDelete()
-                    }
+                FlatButton {
+                    primary: true
+                    text: "Delete"
+                    onClicked: root.confirmDelete()
                 }
             }
         }
@@ -1462,58 +1411,23 @@ Rectangle {
 
                 // Modify a text todo; for an image, the same action is a manual
                 // transcription, so it reads "Transcribe".
-                Rectangle {
+                FlatButton {
                     width: 560
-                    height: 100
-                    color: "black"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: root.menuKind === "image" ? "Transcribe" : "Modify"
-                        font.pixelSize: 40
-                        color: "white"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.editFromMenu()
-                    }
+                    primary: true
+                    text: root.menuKind === "image" ? "Transcribe" : "Modify"
+                    onClicked: root.editFromMenu()
                 }
 
-                Rectangle {
+                FlatButton {
                     width: 560
-                    height: 100
-                    color: "white"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Delete"
-                        font.pixelSize: 40
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.deleteFromMenu()
-                    }
+                    text: "Delete"
+                    onClicked: root.deleteFromMenu()
                 }
 
-                Rectangle {
+                FlatButton {
                     width: 560
-                    height: 100
-                    color: "white"
-                    border.color: "#aaaaaa"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        font.pixelSize: 40
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.menuName = ""
-                    }
+                    text: "Cancel"
+                    onClicked: root.menuName = ""
                 }
             }
         }
@@ -1615,42 +1529,16 @@ Rectangle {
                 }
                 spacing: 40
 
-                Rectangle {
-                    width: 260
-                    height: 100
-                    color: "white"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        font.pixelSize: 40
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.closeEdit()
-                    }
+                FlatButton {
+                    text: "Cancel"
+                    onClicked: root.closeEdit()
                 }
 
-                Rectangle {
-                    readonly property bool ready: editField.text.trim() !== ""
-                    width: 260
-                    height: 100
-                    color: ready ? "black" : "white"
-                    border.color: ready ? "black" : "#aaaaaa"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Save"
-                        font.pixelSize: 40
-                        color: parent.ready ? "white" : "#aaaaaa"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: editField.text.trim() !== ""
-                        onClicked: root.saveEdit()
-                    }
+                FlatButton {
+                    primary: true
+                    enabled: editField.text.trim() !== ""
+                    text: "Save"
+                    onClicked: root.saveEdit()
                 }
             }
         }
@@ -1795,42 +1683,16 @@ Rectangle {
                 }
                 spacing: 40
 
-                Rectangle {
-                    width: 260
-                    height: 100
-                    color: "white"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        font.pixelSize: 40
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.closeAddTodo()
-                    }
+                FlatButton {
+                    text: "Cancel"
+                    onClicked: root.closeAddTodo()
                 }
 
-                Rectangle {
-                    readonly property bool ready: addField.text.trim() !== ""
-                    width: 260
-                    height: 100
-                    color: ready ? "black" : "white"
-                    border.color: ready ? "black" : "#aaaaaa"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Add"
-                        font.pixelSize: 40
-                        color: parent.ready ? "white" : "#aaaaaa"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: addField.text.trim() !== ""
-                        onClicked: root.saveAddTodo()
-                    }
+                FlatButton {
+                    primary: true
+                    enabled: addField.text.trim() !== ""
+                    text: "Add"
+                    onClicked: root.saveAddTodo()
                 }
             }
         }
@@ -2025,44 +1887,23 @@ Rectangle {
                 }
                 spacing: 40
 
-                Rectangle {
+                FlatButton {
                     width: 300
-                    height: 100
-                    color: "white"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "+ New note"
-                        font.pixelSize: 38
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            root.addSheetMode = "new";
-                            titleField.text = "";
-                            titleField.forceActiveFocus();
-                        }
+                    fontSize: 38
+                    text: "+ New note"
+                    onClicked: {
+                        root.addSheetMode = "new";
+                        titleField.text = "";
+                        titleField.forceActiveFocus();
                     }
                 }
 
-                Rectangle {
+                FlatButton {
                     width: 300
-                    height: 100
-                    color: "black"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: root.addNoteDay === root.todayKey ? "Today's note" : "Day's note"
-                        font.pixelSize: 38
-                        color: "white"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.openDayNote(root.addNoteDay)
-                    }
+                    fontSize: 38
+                    primary: true
+                    text: root.addNoteDay === root.todayKey ? "Today's note" : "Day's note"
+                    onClicked: root.openDayNote(root.addNoteDay)
                 }
             }
 
@@ -2142,42 +1983,16 @@ Rectangle {
                 }
                 spacing: 40
 
-                Rectangle {
-                    width: 260
-                    height: 100
-                    color: "white"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Back"
-                        font.pixelSize: 40
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.addSheetMode = "list"
-                    }
+                FlatButton {
+                    text: "Back"
+                    onClicked: root.addSheetMode = "list"
                 }
 
-                Rectangle {
-                    readonly property bool ready: titleField.text.trim() !== ""
-                    width: 260
-                    height: 100
-                    color: ready ? "black" : "white"
-                    border.color: ready ? "black" : "#aaaaaa"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Create"
-                        font.pixelSize: 40
-                        color: parent.ready ? "white" : "#aaaaaa"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        enabled: titleField.text.trim() !== ""
-                        onClicked: root.createExtraNote(root.addNoteDay, titleField.text)
-                    }
+                FlatButton {
+                    primary: true
+                    enabled: titleField.text.trim() !== ""
+                    text: "Create"
+                    onClicked: root.createExtraNote(root.addNoteDay, titleField.text)
                 }
             }
         }
@@ -2261,40 +2076,15 @@ Rectangle {
                 }
                 spacing: 40
 
-                Rectangle {
-                    width: 260
-                    height: 100
-                    color: "white"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Cancel"
-                        font.pixelSize: 40
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.pendingForgetKind = ""
-                    }
+                FlatButton {
+                    text: "Cancel"
+                    onClicked: root.pendingForgetKind = ""
                 }
 
-                Rectangle {
-                    width: 260
-                    height: 100
-                    color: "black"
-                    border.color: "black"
-                    border.width: 3
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Remove"
-                        font.pixelSize: 40
-                        color: "white"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: root.confirmForget()
-                    }
+                FlatButton {
+                    primary: true
+                    text: "Remove"
+                    onClicked: root.confirmForget()
                 }
             }
         }

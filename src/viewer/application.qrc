@@ -5,6 +5,7 @@
         <file>ui/MonthView.qml</file>
         <file>ui/CheckMark.qml</file>
         <file>ui/CloseGlyph.qml</file>
+        <file>ui/FlatButton.qml</file>
         <file>ui/store.js</file>
         <file>ui/ocr.js</file>
         <file>ui/calendar.js</file>
