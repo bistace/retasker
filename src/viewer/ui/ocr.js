@@ -39,23 +39,25 @@ function readBase64(url, onDone) {
 function toBase64(buffer) {
     var b = new Uint8Array(buffer);
     var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    var out = "";
+    // Accumulate into an array and join once: `out += ...` per 3 bytes is O(n^2)
+    // in engines without rope strings, which bites on larger PNGs.
+    var parts = [];
     var i;
     for (i = 0; i + 2 < b.length; i += 3) {
         var n = (b[i] << 16) | (b[i + 1] << 8) | b[i + 2];
-        out += chars[(n >> 18) & 63] + chars[(n >> 12) & 63]
-             + chars[(n >> 6) & 63] + chars[n & 63];
+        parts.push(chars[(n >> 18) & 63] + chars[(n >> 12) & 63]
+             + chars[(n >> 6) & 63] + chars[n & 63]);
     }
     var rem = b.length - i;
     if (rem === 1) {
         var n1 = b[i] << 16;
-        out += chars[(n1 >> 18) & 63] + chars[(n1 >> 12) & 63] + "==";
+        parts.push(chars[(n1 >> 18) & 63] + chars[(n1 >> 12) & 63] + "==");
     } else if (rem === 2) {
         var n2 = (b[i] << 16) | (b[i + 1] << 8);
-        out += chars[(n2 >> 18) & 63] + chars[(n2 >> 12) & 63]
-             + chars[(n2 >> 6) & 63] + "=";
+        parts.push(chars[(n2 >> 18) & 63] + chars[(n2 >> 12) & 63]
+             + chars[(n2 >> 6) & 63] + "=");
     }
-    return out;
+    return parts.join("");
 }
 
 function postOcr(b64, cfg, onResult) {
