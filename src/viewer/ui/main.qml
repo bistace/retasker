@@ -119,6 +119,8 @@ Rectangle {
     property int loadedOffset: 0
     property bool moreAvailable: false
     property var ingested: ({})          // PNG bases ingested this session
+    // Wire-protocol message types. KEEP IN SYNC with the MSG_* defines in
+    // src/backend/src/main.c — both sides hand-maintain this numbering.
     readonly property int msgQuery: 1
     readonly property int msgSetDone: 2
     readonly property int msgSetText: 3

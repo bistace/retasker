@@ -28,6 +28,8 @@
 #define CAPTURE_DIR APP_DIR "/captures"
 #define MAX_MESSAGE_LENGTH 10485760 // 10 MiB, from AppLoad's protocol.h
 
+// Wire-protocol message types. KEEP IN SYNC with the msg* readonly properties in
+// src/viewer/ui/main.qml — both sides hand-maintain this numbering.
 // Request types (viewer -> backend).
 #define MSG_QUERY 1
 #define MSG_SET_DONE 2
