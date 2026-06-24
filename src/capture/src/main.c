@@ -97,7 +97,13 @@ static char *write_png(const uint8_t *rgb, const struct rect *r) {
     mkdir(CAPTURE_DIR, 0755);
     char *path = malloc(256);
     if (path == NULL) return NULL;
-    snprintf(path, 256, "%s/cap-%ld-%d.png", CAPTURE_DIR, (long)time(NULL), counter++);
+    // Millisecond timestamp (not seconds): the counter resets to 0 when the
+    // module reloads, so a second-resolution name could collide with a capture
+    // from a previous load and silently overwrite that todo.
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
+    long long ms = (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000;
+    snprintf(path, 256, "%s/cap-%lld-%d.png", CAPTURE_DIR, ms, counter++);
     if (!stbi_write_png(path, r->w, r->h, 3, rgb, r->w * 3)) {
         fprintf(stderr, "[retasker] PNG write failed: %s\n", path);
         free(path);
@@ -138,87 +144,6 @@ char *captureHandler(const char *value) {
     char *path = write_png(rgb, &r);
     free(rgb);
     return path;
-}
-
-static int has_png_suffix(const char *name) {
-    size_t n = strlen(name);
-    return n > 4 && strcmp(name + n - 4, ".png") == 0;
-}
-
-static int write_text(const char *path, const char *text, size_t len) {
-    FILE *f = fopen(path, "w");
-    if (f == NULL) {
-        fprintf(stderr, "[retasker] txt open failed: %s\n", path);
-        return -1;
-    }
-    fwrite(text, 1, len, f);
-    fclose(f);
-    return 0;
-}
-
-static int hexval(char c) {
-    if (c >= '0' && c <= '9') return c - '0';
-    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
-    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
-    return 0;
-}
-
-// Percent-decode src into dst (dst must be >= strlen(src)+1). Turns %XX into a
-// raw byte; everything else copies through. Returns the decoded byte count.
-static size_t percent_decode(const char *src, char *dst) {
-    size_t j = 0;
-    for (size_t i = 0; src[i] != '\0'; i++) {
-        if (src[i] == '%' && isxdigit((unsigned char)src[i + 1]) &&
-            isxdigit((unsigned char)src[i + 2])) {
-            dst[j++] = (char)((hexval(src[i + 1]) << 4) | hexval(src[i + 2]));
-            i += 2;
-        } else {
-            dst[j++] = src[i];
-        }
-    }
-    return j;
-}
-
-// export: invoked by xovi-message-broker for the "retasker.transcribe" signal.
-// Payload is "<pngfilename> <percent-encoded utf-8 text>": writes <base>.txt
-// with the decoded text and removes the original <base>.png, turning an image
-// todo into a text todo. Percent-encoding keeps the payload single-line and
-// ASCII so it survives the broker transport and round-trips accents/newlines.
-char *transcribeHandler(const char *value) {
-    if (value == NULL) return NULL;
-    const char *sp = strchr(value, ' ');
-    if (sp == NULL) {
-        fprintf(stderr, "[retasker] bad transcribe payload\n");
-        return NULL;
-    }
-
-    size_t name_len = (size_t)(sp - value);
-    const char *encoded = sp + 1;
-    if (name_len == 0 || name_len > 200 || *encoded == '\0') return NULL;
-
-    char name[208];
-    memcpy(name, value, name_len);
-    name[name_len] = '\0';
-    if (strchr(name, '/') != NULL || !has_png_suffix(name)) {
-        fprintf(stderr, "[retasker] bad transcribe filename: %s\n", name);
-        return NULL;
-    }
-
-    char *text = malloc(strlen(encoded) + 1);
-    if (text == NULL) return NULL;
-    size_t text_len = percent_decode(encoded, text);
-
-    char png_path[256], txt_path[256];
-    snprintf(png_path, sizeof(png_path), "%s/%s", CAPTURE_DIR, name);
-    name[name_len - 4] = '\0'; // strip ".png" to derive the base
-    snprintf(txt_path, sizeof(txt_path), "%s/%s.txt", CAPTURE_DIR, name);
-
-    int ok = (write_text(txt_path, text, text_len) == 0);
-    free(text);
-    if (!ok) return NULL;
-    remove(png_path);
-    fprintf(stderr, "[retasker] transcribed %s.png -> %s.txt\n", name, name);
-    return NULL;
 }
 
 #define XOCHITL_DIR "/home/root/.local/share/remarkable/xochitl"
@@ -464,26 +389,5 @@ char *templateHandler(const char *value) {
             landscape ? "true" : "false");
     fclose(f);
     fprintf(stderr, "[retasker] saved template filename='%s' name='%s'\n", filename, name);
-    return NULL;
-}
-
-// export: invoked by xovi-message-broker for the "retasker.delete" signal.
-// Payload is a bare PNG filename; the file is removed from the viewer's
-// captures dir. A '/' in the name is rejected so the payload can't escape it.
-char *deleteHandler(const char *value) {
-    fprintf(stderr, "[retasker] delete signal: %s\n", value ? value : "(null)");
-
-    if (value == NULL || value[0] == '\0' || strchr(value, '/') != NULL) {
-        fprintf(stderr, "[retasker] bad delete payload\n");
-        return NULL;
-    }
-
-    char path[256];
-    snprintf(path, sizeof(path), "%s/%s", CAPTURE_DIR, value);
-    if (remove(path) != 0) {
-        fprintf(stderr, "[retasker] delete failed: %s\n", path);
-        return NULL;
-    }
-    fprintf(stderr, "[retasker] deleted %s\n", path);
     return NULL;
 }
