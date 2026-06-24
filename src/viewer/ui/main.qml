@@ -578,6 +578,17 @@ Rectangle {
         return root.dayLabel(key) + " — " + title;
     }
 
+    // Ask the native bridge to open (creating if needed) the named notebook with
+    // the current default template, then close the viewer so the user lands in it.
+    // The single place the "retasker.newnote" wire shape is built.
+    function openNote(name) {
+        broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
+            name: name,
+            template: settings.noteTemplateFilename
+        }));
+        root.close();
+    }
+
     // Open (or create) the day's primary note, named just by its date. Remember
     // it locally so the calendar and sheet can show that the day has a main note.
     function openDayNote(key) {
@@ -585,11 +596,7 @@ Rectangle {
         next[key] = true;
         root.dayNoteMap = next;
         settings.dayNotesJson = JSON.stringify(next);
-        broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
-            name: root.dayLabel(key),
-            template: settings.noteTemplateFilename
-        }));
-        root.close();
+        root.openNote(root.dayLabel(key));
     }
 
     // The day's notes as list rows: the main note first (if created), then the
@@ -650,11 +657,7 @@ Rectangle {
 
     // Open an existing extra note for a day (the bridge matches by name).
     function openExtraNote(key, title) {
-        broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
-            name: root.dayNoteName(key, title),
-            template: settings.noteTemplateFilename
-        }));
-        root.close();
+        root.openNote(root.dayNoteName(key, title));
     }
 
     // Create a titled note for the day, remember it locally, and open it.
@@ -669,11 +672,7 @@ Rectangle {
         next[key] = list;
         root.notesMap = next;
         settings.notesJson = JSON.stringify(next);
-        broker.sendSimpleSignal("retasker.newnote", JSON.stringify({
-            name: root.dayNoteName(key, t),
-            template: settings.noteTemplateFilename
-        }));
-        root.close();
+        root.openNote(root.dayNoteName(key, t));
     }
 
     function activeDay() {
