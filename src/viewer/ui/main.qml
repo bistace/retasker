@@ -791,36 +791,14 @@ Rectangle {
             }
         }
 
-        Item {
+        CloseGlyph {
             id: closeBtn
-            width: 52
-            height: 52
             anchors {
                 right: parent.right
                 rightMargin: 40
                 verticalCenter: title.verticalCenter
             }
-            Rectangle {
-                anchors.centerIn: parent
-                width: parent.width
-                height: 6
-                radius: 3
-                color: "black"
-                rotation: 45
-            }
-            Rectangle {
-                anchors.centerIn: parent
-                width: parent.width
-                height: 6
-                radius: 3
-                color: "black"
-                rotation: -45
-            }
-            MouseArea {
-                anchors.fill: parent
-                anchors.margins: -24
-                onClicked: root.close()
-            }
+            onClicked: root.close()
         }
 
         Item {
@@ -1899,36 +1877,14 @@ Rectangle {
             }
 
             // Dismiss the whole sheet.
-            Item {
-                width: 52
-                height: 52
+            CloseGlyph {
                 anchors {
                     top: parent.top
                     topMargin: 40
                     right: parent.right
                     rightMargin: 44
                 }
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: parent.width
-                    height: 6
-                    radius: 3
-                    color: "black"
-                    rotation: 45
-                }
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: parent.width
-                    height: 6
-                    radius: 3
-                    color: "black"
-                    rotation: -45
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    anchors.margins: -24
-                    onClicked: root.addNoteOpen = false
-                }
+                onClicked: root.addNoteOpen = false
             }
 
             // ---- List mode: the day's notes -----------------------------
