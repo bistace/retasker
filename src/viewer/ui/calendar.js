@@ -39,6 +39,21 @@ function monthCounts(index, year, month) {
     return { total: total, done: done };
 }
 
+// Add `delta` whole months to a (year, month) pair, rolling the year over.
+// month is 0-based; returns the rolled {year, month}.
+function addMonths(year, month, delta) {
+    var m = month + delta;
+    while (m < 0) {
+        m += 12;
+        year -= 1;
+    }
+    while (m > 11) {
+        m -= 12;
+        year += 1;
+    }
+    return { year: year, month: m };
+}
+
 // Cells for the given month, Monday-first, padded to whole weeks. Leading and
 // trailing pad cells are null so the grid can render them blank.
 function monthGrid(year, month) {

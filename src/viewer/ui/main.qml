@@ -530,34 +530,16 @@ Rectangle {
 
     // Move the add sheet's date picker forward/back by whole months.
     function shiftAddMonth(delta) {
-        var m = root.addPickMonth + delta;
-        var y = root.addPickYear;
-        while (m < 0) {
-            m += 12;
-            y -= 1;
-        }
-        while (m > 11) {
-            m -= 12;
-            y += 1;
-        }
-        root.addPickMonth = m;
-        root.addPickYear = y;
+        var r = Cal.addMonths(root.addPickYear, root.addPickMonth, delta);
+        root.addPickYear = r.year;
+        root.addPickMonth = r.month;
     }
 
     // Move the calendar forward/back by whole months, rolling the year over.
     function shiftMonth(delta) {
-        var m = root.shownMonth + delta;
-        var y = root.shownYear;
-        while (m < 0) {
-            m += 12;
-            y -= 1;
-        }
-        while (m > 11) {
-            m -= 12;
-            y += 1;
-        }
-        root.shownMonth = m;
-        root.shownYear = y;
+        var r = Cal.addMonths(root.shownYear, root.shownMonth, delta);
+        root.shownYear = r.year;
+        root.shownMonth = r.month;
         root.selectedDay = "";
         root.refresh();
     }
