@@ -46,8 +46,8 @@ AFFECT /qml/common/SceneSelectionHandler.qml
                     // out turned 90 deg. Recover the rotation from how the
                     // selection's local +x axis lands in framebuffer space, and
                     // ship it so the native side can rotate the crop back upright.
-                    // ROTATION DIRECTION: if landscape captures come out 180 deg
-                    // off, swap the 90 and 270 below.
+                    // ROTATION DIRECTION verified on device: the 90/270 mapping
+                    // below brings landscape captures back upright as-is.
                     const ax = c1.x - c0.x;
                     const ay = c1.y - c0.y;
                     const rotation = Math.abs(ay) > Math.abs(ax)
