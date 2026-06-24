@@ -60,7 +60,8 @@ static sqlite3 *db;
 static void send_msg(int fd, int32_t type, const char *body) {
     struct PacketHeader hdr = {type, body ? (int32_t)strlen(body) : 0};
     if (send(fd, &hdr, sizeof(hdr), 0) < 0) return;
-    if (hdr.length > 0) send(fd, body, (size_t)hdr.length, 0);
+    if (hdr.length > 0 && send(fd, body, (size_t)hdr.length, 0) < 0)
+        fprintf(stderr, "[retasker-backend] body send failed (type %d)\n", type);
 }
 
 // Copy the string value of a top-level JSON "key":"value" into out. Minimal:
