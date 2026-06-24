@@ -7,6 +7,12 @@
         <file>ui/CloseGlyph.qml</file>
         <file>ui/FlatButton.qml</file>
         <file>ui/ModalSheet.qml</file>
+        <file>ui/DeleteConfirm.qml</file>
+        <file>ui/RowMenu.qml</file>
+        <file>ui/EditSheet.qml</file>
+        <file>ui/AddTodoSheet.qml</file>
+        <file>ui/DayNotesSheet.qml</file>
+        <file>ui/ForgetConfirm.qml</file>
         <file>ui/store.js</file>
         <file>ui/ocr.js</file>
         <file>ui/calendar.js</file>
