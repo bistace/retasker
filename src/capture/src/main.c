@@ -282,6 +282,10 @@ static int json_bool(const char *json, const char *key) {
     return strncmp(p, "true", 4) == 0;
 }
 
+// Reads up to bufsize-1 bytes and NUL-terminates. NOTE: a file larger than the
+// caller's buffer is silently truncated, so match_entry then string-matches a
+// partial buffer. Safe for xochitl's small .metadata files (a few hundred bytes
+// into match_entry's 8 KiB buf); revisit if ever pointed at larger files.
 static int read_file(const char *path, char *buf, size_t bufsize) {
     FILE *f = fopen(path, "r");
     if (f == NULL) return -1;
