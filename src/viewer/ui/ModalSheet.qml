@@ -10,6 +10,10 @@ Rectangle {
     property bool open: false
     property int cardWidth: 720
     property int cardHeight: 560
+    // -1 centers the card vertically. A value >= 0 anchors the card to the top
+    // with that margin, so a text-entry modal stays clear of the bottom-docked
+    // on-screen keyboard instead of being half-covered by it.
+    property int topMargin: -1
     default property alias content: card.data
 
     anchors.fill: parent
@@ -23,7 +27,10 @@ Rectangle {
 
     Rectangle {
         id: card
-        anchors.centerIn: parent
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.verticalCenter: sheet.topMargin < 0 ? parent.verticalCenter : undefined
+        anchors.top: sheet.topMargin < 0 ? undefined : parent.top
+        anchors.topMargin: sheet.topMargin < 0 ? 0 : sheet.topMargin
         width: sheet.cardWidth
         height: sheet.cardHeight
         color: "white"

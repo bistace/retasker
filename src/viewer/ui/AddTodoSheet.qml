@@ -13,7 +13,12 @@ ModalSheet {
 
     open: app.addTodoOpen
     cardWidth: 840
-    cardHeight: app.viewMode === "calendar" ? 720 : 1180
+    // Top-anchored so the card and its buttons stay above the on-screen
+    // keyboard. While typing (field focused) the month picker is hidden and the
+    // card collapses to the compact height — only the calendar view ever needs
+    // the taller card, and only when the keyboard is down.
+    topMargin: 80
+    cardHeight: (app.viewMode === "calendar" || addField.activeFocus) ? 720 : 1180
 
     Text {
         id: addTodoTitle
@@ -88,18 +93,33 @@ ModalSheet {
             right: parent.right
             rightMargin: 48
         }
-        text: "For " + addTodoSheet.app.dayLabel(addTodoSheet.app.addTodoDay)
+        text: {
+            var base = "For " + addTodoSheet.app.dayLabel(addTodoSheet.app.addTodoDay);
+            return (addTodoSheet.app.viewMode !== "calendar" && addField.activeFocus) ? base + "  (tap to change)" : base;
+        }
         font.pixelSize: 34
         font.bold: true
         color: "black"
         elide: Text.ElideRight
+
+        // While typing, the picker is hidden to keep the card compact. Tapping
+        // the date dismisses the keyboard so the picker reappears.
+        MouseArea {
+            anchors.fill: parent
+            enabled: addTodoSheet.app.viewMode !== "calendar" && addField.activeFocus
+            onClicked: {
+                addField.focus = false;
+                Qt.inputMethod.hide();
+            }
+        }
     }
 
     // List view: pick the date. Calendar view keeps the active day, so the
-    // grid is hidden there.
+    // grid is hidden there; it's also hidden while typing so the card can
+    // collapse clear of the keyboard.
     MonthView {
         id: addPicker
-        visible: addTodoSheet.app.viewMode !== "calendar"
+        visible: addTodoSheet.app.viewMode !== "calendar" && !addField.activeFocus
         anchors {
             top: addDateLabel.bottom
             topMargin: 16
