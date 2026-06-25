@@ -13,6 +13,14 @@ ModalSheet {
     cardWidth: 760
     cardHeight: 820
 
+    // Leaving title entry (Back or close) has to drop the field's focus and hide
+    // the input method explicitly; dropping focus alone leaves the on-screen
+    // keyboard lingering over the calendar, same as the edit/add-todo sheets.
+    function dismissKeyboard() {
+        titleField.focus = false;
+        Qt.inputMethod.hide();
+    }
+
     Text {
         id: addTitle
         anchors {
@@ -38,7 +46,10 @@ ModalSheet {
             right: parent.right
             rightMargin: 44
         }
-        onClicked: addSheet.app.addNoteOpen = false
+        onClicked: {
+            addSheet.dismissKeyboard();
+            addSheet.app.addNoteOpen = false;
+        }
     }
 
     // ---- List mode: the day's notes -----------------------------
@@ -277,7 +288,10 @@ ModalSheet {
 
         FlatButton {
             text: "Back"
-            onClicked: addSheet.app.addSheetMode = "list"
+            onClicked: {
+                addSheet.dismissKeyboard();
+                addSheet.app.addSheetMode = "list";
+            }
         }
 
         FlatButton {
