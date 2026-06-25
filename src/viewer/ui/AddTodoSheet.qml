@@ -77,7 +77,7 @@ ModalSheet {
                 topMargin: 20
             }
             visible: addField.text === ""
-            text: "Type the todo text"
+            text: "Type the todo text — one per line"
             font.pixelSize: 38
             color: "#888888"
         }

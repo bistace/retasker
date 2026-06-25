@@ -526,18 +526,25 @@ Rectangle {
         return new Date(p[0], p[1] - 1, p[2], now.getHours(), now.getMinutes(), now.getSeconds()).getTime();
     }
 
-    // Save a typed-in todo: insert a text row dated to the chosen day. The backend
-    // processes this before the re-query that follows, so refresh() shows it.
+    // Save typed-in todos: one text row per non-empty line, all dated to the chosen
+    // day. addSeq keeps the bases unique even though the lines share a timestamp.
+    // The backend processes these before the re-query that follows, so refresh()
+    // shows them.
     function saveAddTodo() {
-        var text = addTodoSheet.field.text.trim();
-        if (text === "")
-            return;
-        root.addSeq += 1;
-        backend.sendMessage(root.msgAdd, JSON.stringify({
-            base: "man-" + (new Date()).getTime() + "-" + root.addSeq,
-            ts: root.dayTs(root.addTodoDay),
-            text: text
-        }));
+        var lines = addTodoSheet.field.text.split("\n");
+        var ts = root.dayTs(root.addTodoDay);
+        var now = (new Date()).getTime();
+        for (var i = 0; i < lines.length; i++) {
+            var text = lines[i].trim();
+            if (text === "")
+                continue;
+            root.addSeq += 1;
+            backend.sendMessage(root.msgAdd, JSON.stringify({
+                base: "man-" + now + "-" + root.addSeq,
+                ts: ts,
+                text: text
+            }));
+        }
         root.closeAddTodo();
         root.refresh();
     }
