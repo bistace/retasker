@@ -104,12 +104,11 @@ static uint8_t *crop_rgb(const struct fb_config *c, const struct rect *r) {
 
 static char *write_png(const uint8_t *rgb, const struct rect *r) {
     static int counter = 0;
-    // The returned path is handed straight back to xovi-message-broker, which
-    // treats the handler result as a borrowed string (it does not free it). A
-    // heap allocation here would leak per capture, so use a static buffer: the
-    // broker marshals the string to its JS caller synchronously, before the next
-    // capture can overwrite it.
-    static char path[256];
+    // xovi-message-broker takes ownership of the string a native handler returns
+    // and free()s it (see broadcastToNative). The path must therefore be a single
+    // heap allocation the broker can free: a static buffer or string literal would
+    // abort xochitl with "free(): invalid pointer" and reboot the device.
+    char path[256];
     mkdir(CAPTURE_DIR, 0755);
     // Millisecond timestamp (not seconds): the counter resets to 0 when the
     // module reloads, so a second-resolution name could collide with a capture
@@ -123,7 +122,7 @@ static char *write_png(const uint8_t *rgb, const struct rect *r) {
         return NULL;
     }
     fprintf(stderr, "[retasker] wrote %s (%dx%d)\n", path, r->w, r->h);
-    return path;
+    return strdup(path);
 }
 
 // export: invoked by xovi-message-broker for the "retasker.capture" signal.
@@ -136,6 +135,8 @@ char *captureHandler(const char *value) {
         return NULL;
     }
 
+    // framebuffer-spy's getConfigString() returns a strdup'd string; the caller
+    // owns it and must free it.
     char *cfg = (char *)(uintptr_t)framebuffer_spy$getConfigString();
     struct fb_config c;
     int ok = parse_fb_config(cfg, &c);
