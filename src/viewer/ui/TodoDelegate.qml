@@ -24,11 +24,14 @@ Item {
     signal toggleClicked
     signal longPressed
 
-    // Long-press anywhere on the row opens the action menu (Modify / Delete).
-    // Declared first so it sits below the toggle (toggle taps still win);
-    // it only handles press-and-hold, so list flicking is unaffected.
+    // The whole row is the completion target: a tap toggles done, a press-and-hold
+    // opens the action menu (Modify / Delete). Declared first so it sits below the
+    // toggle circle, whose own MouseArea consumes taps on it. Qt suppresses the tap
+    // after a long press, so the two gestures don't collide, and a list flick steals
+    // the grab before either fires.
     MouseArea {
         anchors.fill: parent
+        onClicked: row.toggleClicked()
         onPressAndHold: row.longPressed()
     }
 
@@ -95,6 +98,7 @@ Item {
         }
         text: row.text
         font.pixelSize: 40
+        font.strikeout: row.done
         color: "black"
         wrapMode: Text.WordWrap
         maximumLineCount: 4
