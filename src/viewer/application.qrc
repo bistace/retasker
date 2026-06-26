@@ -10,6 +10,7 @@
         <file>ui/DeleteConfirm.qml</file>
         <file>ui/RowMenu.qml</file>
         <file>ui/EditSheet.qml</file>
+        <file>ui/ParentPicker.qml</file>
         <file>ui/AddTodoSheet.qml</file>
         <file>ui/DayNotesSheet.qml</file>
         <file>ui/ForgetConfirm.qml</file>

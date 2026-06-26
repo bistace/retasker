@@ -21,8 +21,19 @@ Item {
     property bool done
     property string dateText
 
+    property bool isChild           // a subtask: indented, no disclosure of its own
+    property int childCount         // subtasks hanging off this row (0 = leaf)
+    property int childOpen          // of those, how many are still open
+    property bool expanded          // children currently spliced in below
+
+    // A parent (has children) gets a disclosure control on the left; subtasks are
+    // indented under it.
+    readonly property bool hasDisclosure: !row.isChild && row.childCount > 0
+    readonly property int indent: row.isChild ? 64 : 0
+
     signal toggleClicked
     signal longPressed
+    signal expandClicked
 
     // The whole row is the completion target: a tap toggles done, a press-and-hold
     // opens the action menu (Modify / Delete). Declared first so it sits below the
@@ -35,12 +46,67 @@ Item {
         onPressAndHold: row.longPressed()
     }
 
+    // Disclosure control for a parent: a chevron plus an open/total badge, its own
+    // tap target so it doesn't trip the row's toggle. Sits left of the circle. The
+    // chevron is drawn (not a glyph) and rotates from "right" to "down" when open,
+    // matching how the rest of the UI draws its symbols.
+    Item {
+        id: disclosure
+        visible: row.hasDisclosure
+        anchors {
+            left: parent.left
+            leftMargin: 24
+            verticalCenter: parent.verticalCenter
+        }
+        width: 116
+        height: 56
+
+        Canvas {
+            id: chevron
+            anchors {
+                left: parent.left
+                verticalCenter: parent.verticalCenter
+            }
+            width: 26
+            height: 26
+            rotation: row.expanded ? 90 : 0
+            onPaint: {
+                var ctx = getContext("2d");
+                ctx.reset();
+                ctx.fillStyle = "black";
+                ctx.beginPath();
+                ctx.moveTo(5, 3);
+                ctx.lineTo(5, height - 3);
+                ctx.lineTo(width - 4, height / 2);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        Text {
+            anchors {
+                left: chevron.right
+                leftMargin: 14
+                verticalCenter: parent.verticalCenter
+            }
+            text: (row.childCount - row.childOpen) + "/" + row.childCount
+            font.pixelSize: 30
+            color: "black"
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            anchors.margins: -16
+            onClicked: row.expandClicked()
+        }
+    }
+
     // Toggle circle (large tap target on the left).
     Rectangle {
         id: check
         anchors {
             left: parent.left
-            leftMargin: 36
+            leftMargin: 36 + row.indent + (row.hasDisclosure ? 120 : 0)
             verticalCenter: parent.verticalCenter
         }
         width: 56
@@ -97,7 +163,7 @@ Item {
             verticalCenter: parent.verticalCenter
         }
         text: row.text
-        font.pixelSize: 40
+        font.pixelSize: row.isChild ? 34 : 40
         font.strikeout: row.done
         color: "black"
         wrapMode: Text.WordWrap

@@ -70,6 +70,12 @@ Rectangle {
     property string menuKind: ""
     property string menuText: ""
     property string menuUrl: ""
+    property int menuChildCount: 0   // gates "Make subtask of…" (only childless rows)
+
+    // Parent picker: nestChildBase (a row's base) drives visibility; the picker
+    // lists top-level todos to nest it under. nestChildText previews the subtask.
+    property string nestChildBase: ""
+    property string nestChildText: ""
 
     // Edit sheet: editName (a row filename) drives visibility; editBase keys the
     // write. The field starts from the current transcription (empty for an image).
@@ -128,10 +134,13 @@ Rectangle {
     readonly property int msgIngest: 5
     readonly property int msgCal: 6
     readonly property int msgAdd: 7
+    readonly property int msgSetParent: 8
+    readonly property int msgChildren: 9
     readonly property int msgReady: 100
     readonly property int msgRows: 101
     readonly property int msgIngested: 102
     readonly property int msgCalRows: 103
+    readonly property int msgChildRows: 104
 
     Settings {
         id: settings
@@ -266,6 +275,8 @@ Rectangle {
                 root.appendRow(list[i]);
             root.loadedOffset = data.offset + list.length;
             root.moreAvailable = list.length === root.pageSize;
+        } else if (type === root.msgChildRows) {
+            root.insertChildren(data.base, data.rows || []);
         } else if (type === root.msgCalRows) {
             root.dayIndex = Cal.buildIndex(data.rows || []);
         } else if (type === root.msgIngested) {
@@ -275,18 +286,76 @@ Rectangle {
     }
 
     // Turn a backend todo row into a list-model entry. An image row (awaiting
-    // OCR) points at its PNG; a text row carries its transcription.
-    function appendRow(r) {
+    // OCR) points at its PNG; a text row carries its transcription. `parentBase`
+    // is "" for a top-level row, or the parent's base for a spliced-in subtask.
+    function rowEntry(r, parentBase) {
         var image = r.hasImage === 1 || r.hasImage === true;
-        rows.append({
+        return {
             base: r.base,
             name: r.base + (image ? ".png" : ".txt"),
             kind: image ? "image" : "text",
             text: r.text ? r.text : "",
             url: root.capturesDir + "/" + r.base + ".png",
             done: r.done === 1 || r.done === true,
-            dateText: Qt.formatDateTime(new Date(r.ts), "d MMM HH:mm")
-        });
+            dateText: Qt.formatDateTime(new Date(r.ts), "d MMM HH:mm"),
+            parent: parentBase,
+            isChild: parentBase !== "",
+            childCount: r.childCount || 0,
+            childOpen: r.childOpen || 0,
+            expanded: false
+        };
+    }
+
+    function appendRow(r) {
+        rows.append(root.rowEntry(r, ""));
+    }
+
+    // Splice a parent's children into the flat model right after it, marking it
+    // expanded. The reply can arrive for a parent that's since been collapsed or
+    // dropped, so re-check before inserting; ignore a second reply once expanded.
+    function insertChildren(parentBase, list) {
+        for (var i = 0; i < rows.count; i++) {
+            if (rows.get(i).base === parentBase && !rows.get(i).isChild) {
+                if (rows.get(i).expanded)
+                    return;
+                rows.setProperty(i, "expanded", true);
+                for (var j = 0; j < list.length; j++)
+                    rows.insert(i + 1 + j, root.rowEntry(list[j], parentBase));
+                return;
+            }
+        }
+    }
+
+    // Expand a collapsed parent (fetch its children lazily) or collapse an
+    // expanded one (drop the contiguous run of child rows that follow it).
+    function toggleExpand(base) {
+        for (var i = 0; i < rows.count; i++) {
+            if (rows.get(i).base !== base || rows.get(i).isChild)
+                continue;
+            if (rows.get(i).expanded) {
+                rows.setProperty(i, "expanded", false);
+                var k = i + 1;
+                while (k < rows.count && rows.get(k).isChild)
+                    rows.remove(k);
+            } else {
+                backend.sendMessage(root.msgChildren, JSON.stringify({
+                    base: base
+                }));
+            }
+            return;
+        }
+    }
+
+    // Keep a parent's open-count badge in step when one of its children toggles,
+    // without re-querying (which would collapse the whole list).
+    function adjustParentOpen(parentBase, delta) {
+        for (var i = 0; i < rows.count; i++) {
+            if (rows.get(i).base === parentBase && !rows.get(i).isChild) {
+                var n = rows.get(i).childOpen + delta;
+                rows.setProperty(i, "childOpen", n < 0 ? 0 : n);
+                return;
+            }
+        }
     }
 
     // Ingest every capture the folder lists into the DB (the backend ignores
@@ -397,22 +466,28 @@ Rectangle {
     }
 
     function toggle(base) {
+        var isChild = false;
         for (var i = 0; i < rows.count; i++) {
             if (rows.get(i).base === base) {
                 var done = !rows.get(i).done;
+                isChild = rows.get(i).isChild;
+                var parentBase = rows.get(i).parent;
                 rows.setProperty(i, "done", done);
                 backend.sendMessage(root.msgSetDone, JSON.stringify({
                     base: base,
                     done: done
                 }));
+                if (isChild)
+                    root.adjustParentOpen(parentBase, done ? -1 : 1);
                 break;
             }
         }
-        // Re-scope the view to match: a status-filtered list drops the row, and
-        // the calendar's per-day counts change.
+        // Re-scope the view to match: a status-filtered list drops a top-level
+        // row, and the calendar's per-day counts change. A child stays put — an
+        // expanded parent always shows all its children — so it never re-queries.
         if (root.viewMode === "calendar")
             root.requestCal();
-        else if (root.filter !== "all")
+        else if (!isChild && root.filter !== "all")
             root.refresh();
     }
 
@@ -463,6 +538,7 @@ Rectangle {
             root.menuKind = r.kind;
             root.menuText = r.text;
             root.menuUrl = r.url;
+            root.menuChildCount = r.childCount;
         }
         root.menuName = name;
     }
@@ -479,6 +555,42 @@ Rectangle {
         var name = root.menuName;
         root.menuName = "";
         root.askDelete(name);
+    }
+
+    // Close the menu and open the parent picker for the selected todo.
+    function nestFromMenu() {
+        root.nestChildBase = root.menuBase;
+        root.nestChildText = root.menuKind === "image" ? "(handwritten todo)" : root.menuText;
+        root.menuName = "";
+    }
+
+    // Loaded top-level todos that can be a parent: everything not itself a subtask
+    // and not the todo being nested. One level deep, so a candidate may already
+    // have children — it just gains another.
+    function parentCandidates() {
+        var out = [];
+        for (var i = 0; i < rows.count; i++) {
+            var r = rows.get(i);
+            if (r.isChild || r.base === root.nestChildBase)
+                continue;
+            out.push({
+                base: r.base,
+                label: r.kind === "image" ? "(handwritten todo)" : r.text,
+                dateText: r.dateText
+            });
+        }
+        return out;
+    }
+
+    // Nest the picked todo under a chosen parent. Re-query so it leaves the top
+    // level and the parent's child counts refresh (this collapses any expansions).
+    function chooseParent(parentBase) {
+        backend.sendMessage(root.msgSetParent, JSON.stringify({
+            base: root.nestChildBase,
+            parent: parentBase
+        }));
+        root.nestChildBase = "";
+        root.refresh();
     }
 
     // Save an edited todo: store the text in the DB. The backend drops the .png
@@ -1087,8 +1199,13 @@ Rectangle {
             imageUrl: model.url
             done: model.done
             dateText: model.dateText
+            isChild: model.isChild
+            childCount: model.childCount
+            childOpen: model.childOpen
+            expanded: model.expanded
             onToggleClicked: root.toggle(model.base)
             onLongPressed: root.openRowMenu(model.name)
+            onExpandClicked: root.toggleExpand(model.base)
         }
     }
 
@@ -1226,6 +1343,11 @@ Rectangle {
     // --- Edit sheet -------------------------------------------------------
     EditSheet {
         id: editSheet
+        app: root
+    }
+
+    // --- Parent picker (Make subtask of…) --------------------------------
+    ParentPicker {
         app: root
     }
 
