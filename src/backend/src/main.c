@@ -38,11 +38,14 @@
 #define MSG_INGEST 5
 #define MSG_CAL 6
 #define MSG_ADD 7
+#define MSG_SET_PARENT 8
+#define MSG_CHILDREN 9
 // Reply types (backend -> viewer).
 #define MSG_READY 100
 #define MSG_ROWS 101
 #define MSG_INGESTED 102
 #define MSG_CAL_ROWS 103
+#define MSG_CHILD_ROWS 104
 // System types (AppLoad -> backend). A new frontend attaching re-announces us so
 // it can load even if it missed the first READY; terminate ends the process.
 #define MSG_NEW_COORDINATOR -2
@@ -110,9 +113,14 @@ static int db_open(void) {
                          "  ts INTEGER NOT NULL,"
                          "  text TEXT,"
                          "  done INTEGER NOT NULL DEFAULT 0,"
-                         "  has_image INTEGER NOT NULL DEFAULT 1);"
+                         "  has_image INTEGER NOT NULL DEFAULT 1,"
+                         "  parent TEXT);"
                          "CREATE INDEX IF NOT EXISTS idx_todos_ts ON todos(ts);";
-    return sqlite3_exec(db, schema, NULL, NULL, NULL) == SQLITE_OK ? 0 : -1;
+    if (sqlite3_exec(db, schema, NULL, NULL, NULL) != SQLITE_OK) return -1;
+    // Pre-existing DBs predate the subtask column. ADD COLUMN errors once it's
+    // there (SQLite has no IF NOT EXISTS for columns), so the result is ignored.
+    sqlite3_exec(db, "ALTER TABLE todos ADD COLUMN parent TEXT", NULL, NULL, NULL);
+    return 0;
 }
 
 // Run an UPDATE/DELETE/INSERT that binds the message JSON as ?1. Returns the
@@ -150,16 +158,31 @@ static void handle_query(int fd, const char *json) {
     static const char *sql =
         "SELECT json_object('offset', json_extract(?1,'$.offset'), 'rows', json(coalesce(("
         "  SELECT json_group_array(json_object("
-        "    'base',base,'ts',ts,'text',text,'done',done,'hasImage',has_image))"
+        "    'base',base,'ts',ts,'text',text,'done',done,'hasImage',has_image,"
+        "    'childCount',(SELECT count(*) FROM todos c WHERE c.parent=t.base),"
+        "    'childOpen',(SELECT count(*) FROM todos c WHERE c.parent=t.base AND c.done=0)))"
         "  FROM (SELECT base,ts,text,done,has_image FROM todos WHERE"
-        "    (json_extract(?1,'$.filter')='all'"
+        "    parent IS NULL"
+        "    AND (json_extract(?1,'$.filter')='all'"
         "     OR (json_extract(?1,'$.filter')='todo' AND done=0)"
         "     OR (json_extract(?1,'$.filter')='done' AND done=1))"
         "    AND (json_extract(?1,'$.rangeStart') IS NULL OR ts>=json_extract(?1,'$.rangeStart'))"
         "    AND (json_extract(?1,'$.rangeEnd') IS NULL OR ts<json_extract(?1,'$.rangeEnd'))"
         "    ORDER BY ts DESC"
-        "    LIMIT json_extract(?1,'$.limit') OFFSET json_extract(?1,'$.offset'))),'[]')))";
+        "    LIMIT json_extract(?1,'$.limit') OFFSET json_extract(?1,'$.offset')) t),'[]')))";
     reply_json_query(fd, MSG_ROWS, sql, json);
+}
+
+// All children of one parent, oldest-first (natural checklist order), regardless
+// of done state — the viewer shows every child when a parent is expanded. The
+// reply echoes the parent base so the viewer knows which row to splice under.
+static void handle_children(int fd, const char *json) {
+    static const char *sql =
+        "SELECT json_object('base',json_extract(?1,'$.base'),'rows', json(coalesce(("
+        "  SELECT json_group_array(json_object("
+        "    'base',base,'ts',ts,'text',text,'done',done,'hasImage',has_image))"
+        "  FROM todos WHERE parent=json_extract(?1,'$.base') ORDER BY ts),'[]')))";
+    reply_json_query(fd, MSG_CHILD_ROWS, sql, json);
 }
 
 // {ts,done} for every todo in a window; the viewer buckets them into local days
@@ -204,8 +227,21 @@ static void dispatch(int fd, int32_t type, const char *json) {
         remove_png(json);
         break;
     case MSG_DELETE:
+        // Orphaned children are promoted to top-level, not deleted with the parent.
+        exec_with_json("UPDATE todos SET parent=NULL "
+                       "WHERE parent=json_extract(?1,'$.base')",
+                       json);
         exec_with_json("DELETE FROM todos WHERE base=json_extract(?1,'$.base')", json);
         remove_png(json);
+        break;
+    case MSG_SET_PARENT:
+        // Nest a todo under another (parent), or un-nest it (parent: null).
+        exec_with_json("UPDATE todos SET parent=json_extract(?1,'$.parent') "
+                       "WHERE base=json_extract(?1,'$.base')",
+                       json);
+        break;
+    case MSG_CHILDREN:
+        handle_children(fd, json);
         break;
     case MSG_INGEST:
         handle_ingest(fd, json);
