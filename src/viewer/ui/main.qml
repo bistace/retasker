@@ -674,6 +674,15 @@ Rectangle {
         root.addPickMonth = r.month;
     }
 
+    // Jump the calendar back to the current month and select today.
+    function jumpToToday() {
+        var p = root.todayKey.split("-");
+        root.shownYear = parseInt(p[0], 10);
+        root.shownMonth = parseInt(p[1], 10) - 1;
+        root.selectedDay = root.todayKey;
+        root.refresh();
+    }
+
     // Move the calendar forward/back by whole months, rolling the year over.
     function shiftMonth(delta) {
         var r = Cal.addMonths(root.shownYear, root.shownMonth, delta);
@@ -1078,6 +1087,7 @@ Rectangle {
         }
         onPrevMonth: root.shiftMonth(-1)
         onNextMonth: root.shiftMonth(1)
+        onGoToday: root.jumpToToday()
     }
 
     // Context strip above the todo list while in calendar view: the shown month,
