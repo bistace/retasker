@@ -15,3 +15,5 @@ docker run --rm -v "$REPO:/repo" retasker-toolchain:latest sh -lc '
 
 echo "built: $REPO/build/retasker-viewer.rcc"
 echo "deploy: scp to <device>:/home/root/xovi/exthome/appload/retasker/resources.rcc"
+echo "icon:   scp src/viewer/assets/icon.png to <device>:/home/root/xovi/exthome/appload/retasker/icon.png"
+echo "        (regenerate with: python3 src/viewer/assets/gen_icon.py src/viewer/assets/icon.png)"
