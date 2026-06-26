@@ -1,3 +1,5 @@
 /build/
 # Holds the OpenRouter API key; deployed to the device, never committed.
 src/viewer/config.json
+# Desktop design emulator: local dev tooling, not part of the shipped app.
+/emulator/
