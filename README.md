@@ -27,9 +27,9 @@ The device is a **reMarkable Paper Pro** ("ferrari"), OS **3.27.1.0**. The hasht
 
 ## 1. Get back into the tablet
 
-A factory reset wipes the authorized SSH key, the WiFi-SSH marker, and developer access. Start over USB.
+A factory reset wipes the authorized SSH key, the WiFi-SSH marker, and Developer Mode. SSH doesn't exist on the Paper Pro until Developer Mode is back on, so start there: **Settings → General → Paper Tablet → Software → Advanced → Developer Mode**. Turning it on factory-resets the tablet a *second* time, so let anything you care about sync to the cloud first, then wait out the reset.
 
-Plug in. On the tablet, open Settings and find the device password (Help → Copyrights and licenses → General information, or wherever the current OS hides "ssh"). Then authorize the dedicated key — the default `~/.ssh/id_ed25519` is deliberately not trusted:
+With Developer Mode on, plug in over USB — the tablet comes up as a USB-ethernet device at `10.11.99.1` and generates a root password. Read it off the tablet under **Settings → General → Help → About → Copyrights and licenses**, beneath the **GPLv3 Compliance** header (it lists the password and the IPs you can reach). Then authorize the dedicated key — the default `~/.ssh/id_ed25519` is deliberately not trusted:
 
 ```sh
 ssh-copy-id -i ~/.ssh/retasker_tablet_ed25519.pub root@10.11.99.1
@@ -51,16 +51,45 @@ From here on, `~/bin/rmpp '<cmd>'` resolves the tablet's DHCP address by its wla
 
 ## 2. Put XOVI back
 
-reTasker needs XOVI plus four modules: `appload`, `framebuffer-spy`, `qt-resource-rebuilder`, `xovi-message-broker`. Install XOVI per the upstream instructions (asivery/xovi) and pull the modules through `vellum`, the on-device package manager at `/home/root/.vellum/bin/vellum`. Last known-good set: xovi 0.3.3-r2, xovi-extensions 19.0.0, appload 0.5.3.
+reTasker needs XOVI plus four modules: `appload`, `framebuffer-spy`, `qt-resource-rebuilder`, `xovi-message-broker`. **Install the XOVI core the manual way, not through vellum** — `vellum add xovi` skips the `start`, `stock`, `debug`, and `rebuild_hashtable` scripts you need to load, reload, and maintain it. The four modules then come cleanly from **vellum**, the reMarkable package manager. Everything here runs on the tablet over SSH (`rmpp '<cmd>'`), and the tablet needs internet — the installer pulls XOVI from GitHub.
 
-After an OS change, three commands matter and the order is load-bearing:
+Grab `extensions-aarch64.zip` from the [rm-xovi-extensions releases](https://github.com/asivery/rm-xovi-extensions/releases), unzip it, and copy the installer to the tablet (use the IP `rmpp` prints):
 
 ```sh
-rmpp '/home/root/.vellum/bin/vellum reenable'   # restore system-partition mods after an OS upgrade
-rmpp '/home/root/xovi/rebuild_hashtable'        # interactive — needs the device password on-screen
+IP=$(rmpp true 2>&1 >/dev/null | sed -n 's/.*found at //p')
+scp -i ~/.ssh/retasker_tablet_ed25519 -o IdentitiesOnly=yes \
+    install-xovi-for-rm root@$IP:/home/root/
 ```
 
-`rebuild_hashtable` prompts and reads a password typed on the tablet itself; it stops on its own at "Hashtab saved". The hashtab must match the running OS — a 3.24 hashtab on 3.27 loads zero entries and silently crash-loops AppLoad. The qmldiff patches qt-resource-rebuilder reads live in `xovi/exthome/qt-resource-rebuilder/`, which is where reTasker's four `.qmd` files go in the next step.
+Run it on the device — it downloads `xovi.so` and lays down `/home/root/xovi/` with the `start`, `stock`, `debug`, and `rebuild_hashtable` scripts:
+
+```sh
+rmpp 'chmod +x /home/root/install-xovi-for-rm && /home/root/install-xovi-for-rm'
+```
+
+Now install vellum for the modules. Pull the current bootstrap one-liner and its checksum from the [vellum-cli releases page](https://github.com/vellum-dev/vellum-cli/releases/latest); it downloads, verifies, and runs `bootstrap.sh`, landing vellum at `/home/root/.vellum/bin/vellum`:
+
+```sh
+rmpp 'wget --no-check-certificate -O bootstrap.sh \
+  https://github.com/vellum-dev/vellum-cli/releases/latest/download/bootstrap.sh && bash bootstrap.sh'
+```
+
+`bootstrap.sh` adds vellum to `.bashrc`, but that won't carry across separate `rmpp` calls, so invoke it by full path. Refresh the index and pull the four modules:
+
+```sh
+rmpp '/home/root/.vellum/bin/vellum update'
+rmpp '/home/root/.vellum/bin/vellum add appload framebuffer-spy qt-resource-rebuilder xovi-message-broker'
+```
+
+Last known-good set: xovi 0.3.3-r2, appload 0.5.3, the extensions at 19.0.0.
+
+Now build the qmldiff hashtab:
+
+```sh
+rmpp '/home/root/xovi/rebuild_hashtable'   # interactive — enter the device password on the tablet screen
+```
+
+`rebuild_hashtable` prompts and reads a password typed on the tablet itself; it stops on its own at "Hashtab saved". The hashtab must match the running OS — a 3.24 hashtab on 3.27 loads zero entries and silently crash-loops AppLoad. If you landed here by *upgrading* the OS rather than a clean install, run `vellum reenable` first to restore the system-partition mods (it nags until you do). The qmldiff patches qt-resource-rebuilder reads live in `xovi/exthome/qt-resource-rebuilder/`, which is where reTasker's four `.qmd` files go in the next step.
 
 XOVI is tethered: a full reboot drops back to stock until you run `xovi/start`. Keep that command handy — you'll use it as the reload at the end.
 
