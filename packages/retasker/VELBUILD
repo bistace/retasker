@@ -13,8 +13,9 @@ license="GPL-3.0"
 depends="appload qt-resource-rebuilder xovi-message-broker framebuffer-spy remarkable-os>=3.27 remarkable-os<3.28"
 source="https://github.com/bistace/retasker/releases/download/v$pkgver/retasker-$pkgver-aarch64.tar.gz"
 sha512sums="7290db8613902cd8023c47ddc0c96cee690ecf004c1f649b4a1fa2b5d97fcf4763b54dfab6420f059486d1e4a098a11c774df10e564be328781ada358f736be2  retasker-$pkgver-aarch64.tar.gz"
-# !strip: binaries are prebuilt aarch64; the x86_64 builder has no cross-strip.
-options="!check !fhs !strip"
+# Prebuilt aarch64 binaries: the x86_64 builder has no cross-strip, and the runtime
+# libs (libc, Qt) come from the reMarkable system, not apk packages.
+options="!check !fhs !strip !tracedeps"
 
 package() {
     local app="$pkgdir/home/root/xovi/exthome/appload/retasker"
