@@ -7,10 +7,10 @@ import "store.js" as Store
 import "ocr.js" as Ocr
 import "calendar.js" as Cal
 
-// reTasker viewer — an AppLoad app backed by retasker-backend.
+// reTasker viewer -- an AppLoad app backed by retasker-backend.
 //
 // Todos live in a SQLite database owned by the backend process (this Qt build
-// ships no SQLite, so the viewer can't open one itself — it talks to the backend
+// ships no SQLite, so the viewer can't open one itself -- it talks to the backend
 // over AppLoad). The viewer asks for a page of todos and renders it; the backend
 // does the sorting, filtering and calendar bucketing. The PNG snippets the
 // capture extension drops into capturesDir are the only files left on disk: the
@@ -70,7 +70,7 @@ Rectangle {
     property string menuKind: ""
     property string menuText: ""
     property string menuUrl: ""
-    property int menuChildCount: 0   // gates "Make subtask of…" (only childless rows)
+    property int menuChildCount: 0   // gates "Make subtask of..." (only childless rows)
 
     // Parent picker: nestChildBase (a row's base) drives visibility; the picker
     // lists top-level todos to nest it under. nestChildText previews the subtask.
@@ -118,7 +118,7 @@ Rectangle {
     readonly property int ocrMax: 3
 
     // Backend (retasker-backend, an AppLoad process owning the SQLite DB). The
-    // viewer only loads once the backend signals READY — messages sent before its
+    // viewer only loads once the backend signals READY -- messages sent before its
     // socket is registered are dropped. Todos are fetched one page at a time.
     property bool backendReady: false
     property int pageSize: 200
@@ -126,7 +126,7 @@ Rectangle {
     property bool moreAvailable: false
     property var ingested: ({})          // PNG bases ingested this session
     // Wire-protocol message types. KEEP IN SYNC with the MSG_* defines in
-    // src/backend/src/main.c — both sides hand-maintain this numbering.
+    // src/backend/src/main.c -- both sides hand-maintain this numbering.
     readonly property int msgQuery: 1
     readonly property int msgSetDone: 2
     readonly property int msgSetText: 3
@@ -154,7 +154,7 @@ Rectangle {
         property bool openSettingsOnStart: false
     }
 
-    // Native side (retasker-capture.so) handles the actual file removal.
+    // Broker for native newnote/chooseTemplate signals.
     XoviMessageBroker {
         id: broker
     }
@@ -360,7 +360,7 @@ Rectangle {
 
     // Ingest every capture the folder lists into the DB (the backend ignores
     // ones it already has) and OCR any not transcribed yet. This is the only use
-    // of the folder model — the displayed list comes from the backend.
+    // of the folder model -- the displayed list comes from the backend.
     function syncFolder() {
         if (!root.backendReady)
             return;  // re-run on READY; sending now would be dropped, and an OCR
@@ -483,8 +483,8 @@ Rectangle {
             }
         }
         // Re-scope the view to match: a status-filtered list drops a top-level
-        // row, and the calendar's per-day counts change. A child stays put — an
-        // expanded parent always shows all its children — so it never re-queries.
+        // row, and the calendar's per-day counts change. A child stays put -- an
+        // expanded parent always shows all its children -- so it never re-queries.
         if (root.viewMode === "calendar")
             root.requestCal();
         else if (!isChild && root.filter !== "all")
@@ -566,7 +566,7 @@ Rectangle {
 
     // Loaded top-level todos that can be a parent: everything not itself a subtask
     // and not the todo being nested. One level deep, so a candidate may already
-    // have children — it just gains another.
+    // have children -- it just gains another.
     function parentCandidates() {
         var out = [];
         for (var i = 0; i < rows.count; i++) {
@@ -1009,7 +1009,7 @@ Rectangle {
                 }
             }
 
-            // Status filter — only meaningful for the flat list.
+            // Status filter -- only meaningful for the flat list.
             Row {
                 spacing: 0
                 visible: root.viewMode === "list"
@@ -1356,7 +1356,7 @@ Rectangle {
         app: root
     }
 
-    // --- Parent picker (Make subtask of…) --------------------------------
+    // --- Parent picker (Make subtask of...) --------------------------------
     ParentPicker {
         app: root
     }

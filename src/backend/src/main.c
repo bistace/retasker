@@ -1,4 +1,4 @@
-// reTasker backend — the todo database, as an AppLoad backend process.
+// reTasker backend -- the todo database, as an AppLoad backend process.
 //
 // AppLoad launches this with argv[1] = a unix SOCK_SEQPACKET socket it created;
 // we connect and speak its protocol: each message is an 8-byte header
@@ -29,7 +29,7 @@
 #define MAX_MESSAGE_LENGTH 10485760 // 10 MiB, from AppLoad's protocol.h
 
 // Wire-protocol message types. KEEP IN SYNC with the msg* readonly properties in
-// src/viewer/ui/main.qml — both sides hand-maintain this numbering.
+// src/viewer/ui/main.qml -- both sides hand-maintain this numbering.
 // Request types (viewer -> backend).
 #define MSG_QUERY 1
 #define MSG_SET_DONE 2
@@ -71,7 +71,7 @@ static void send_msg(int fd, int32_t type, const char *body) {
 // quoted string values only, handles a backslash-escaped char. Returns 1 if
 // found. Used solely to pull a todo's base name for file removal.
 //
-// Intentionally byte-identical to json_str() in src/capture/src/main.c: the two
+// Intentionally byte-identical to json_str() in src/capture/src/bridge.c: the two
 // modules build in isolation (each Makefile is run on its own copied subtree), so
 // there is no shared header to lift this into. Keep the two copies in sync.
 static int json_str(const char *json, const char *key, char *out, size_t outsize) {
@@ -174,7 +174,7 @@ static void handle_query(int fd, const char *json) {
 }
 
 // All children of one parent, oldest-first (natural checklist order), regardless
-// of done state — the viewer shows every child when a parent is expanded. The
+// of done state -- the viewer shows every child when a parent is expanded. The
 // reply echoes the parent base so the viewer knows which row to splice under.
 static void handle_children(int fd, const char *json) {
     static const char *sql =
