@@ -1,0 +1,53 @@
+# On a published release, build the aarch64 bundle, attach it to the release, and
+# sync the VELBUILD checksum back to main so the package definition matches the
+# artifact users download. The toolchain image is pulled from GHCR (built by
+# toolchain-image.yml), so this job only cross-compiles — no SDK download.
+name: release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main # check out main so the checksum commit lands there
+
+      - name: Pull toolchain image
+        run: |
+          IMG=ghcr.io/${{ github.repository_owner }}/retasker-toolchain:latest
+          docker pull "$IMG"
+          docker tag "$IMG" retasker-toolchain:latest
+
+      - name: Build release bundle
+        run: ./bundle-release.sh "${GITHUB_REF_NAME#v}"
+
+      - name: Upload tarball to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" build/retasker-*-aarch64.tar.gz --clobber
+
+      # Regenerate the package checksum from the artifact just built — the apk analog
+      # of `abuild checksum`. Replaces only the hash and pkgver, leaving the rest intact.
+      - name: Sync VELBUILD to release
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          SUM=$(shasum -a 512 "build/retasker-$VER-aarch64.tar.gz" | awk '{print $1}')
+          sed -i -E "s|^pkgver=.*|pkgver=$VER|" packages/retasker/VELBUILD
+          sed -i -E "s|^(sha512sums=\")[a-f0-9]+|\1$SUM|" packages/retasker/VELBUILD
+
+      - name: Commit checksum if changed
+        run: |
+          if ! git diff --quiet packages/retasker/VELBUILD; then
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add packages/retasker/VELBUILD
+            git commit -m "chore: sync VELBUILD to ${GITHUB_REF_NAME}"
+            git push origin main
+          fi

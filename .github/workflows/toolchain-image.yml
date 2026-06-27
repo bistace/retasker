@@ -1,0 +1,36 @@
+# Builds the ferrari Yocto SDK toolchain image and pushes it to GHCR so the
+# release workflow can pull it instead of rebuilding the SDK on every run.
+# Only fires when the Dockerfile changes; also runnable on demand.
+name: toolchain-image
+
+on:
+  push:
+    branches: [main]
+    paths: ["toolchain/Dockerfile"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Runner is amd64 and the image is amd64, so this is a native build (no qemu).
+      - uses: docker/build-push-action@v6
+        with:
+          context: toolchain
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/retasker-toolchain:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
