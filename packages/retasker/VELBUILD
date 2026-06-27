@@ -1,6 +1,6 @@
 maintainer="Benjamin Istace <benjamin.istace@gmail.com>"
 pkgname=retasker
-pkgver=1.0
+pkgver=1.0.1
 pkgrel=0
 upstream_author="Benjamin Istace"
 category=apps
@@ -12,7 +12,7 @@ license="GPL-3.0"
 # hashtab-bound to the OS, so pin the reMarkable OS range the hashtab was built for.
 depends="appload qt-resource-rebuilder xovi-message-broker framebuffer-spy remarkable-os>=3.27 remarkable-os<3.28"
 source="https://github.com/bistace/retasker/releases/download/v$pkgver/retasker-$pkgver-aarch64.tar.gz"
-sha512sums="d2d7eb0f1c4332f2398ac10589fe2cafc792a8fc2aaa777bda6e96131a667e95e9cf93363548a4527119885459fabdad1821e97e7ba4fa2216e1f7fecfe64535  retasker-$pkgver-aarch64.tar.gz"
+sha512sums="9024e04fa885d1c246bfa15265a9d8b97781460a52f7e38331da1725099e49a5bc2b47fd215a9d006296ee70cf9f1d72bcae5ba13a5f01463538ca3218d69a1c  retasker-$pkgver-aarch64.tar.gz"
 options="!check !fhs"
 
 package() {
