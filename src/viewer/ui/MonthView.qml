@@ -162,7 +162,7 @@ Item {
                     border.color: "black"
                     border.width: cell.isToday ? 6 : (cell.isSelected ? 4 : 0)
 
-                    // Day number — today reverses out of a solid black disc.
+                    // Day number -- today reverses out of a solid black disc.
                     Item {
                         anchors {
                             top: parent.top

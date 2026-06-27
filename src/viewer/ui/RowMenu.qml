@@ -10,11 +10,11 @@ ModalSheet {
 
     open: app.menuName !== ""
     cardWidth: 720
-    // The "Make subtask of…" action only applies to a childless todo, so the card
+    // The "Make subtask of..." action only applies to a childless todo, so the card
     // grows to fit it only then.
     cardHeight: app.menuChildCount === 0 ? 880 : 740
 
-    // Preview of the todo being acted on — its text, or the snippet image.
+    // Preview of the todo being acted on -- its text, or the snippet image.
     Rectangle {
         id: menuPreview
         anchors {
@@ -76,7 +76,7 @@ ModalSheet {
             onClicked: rowMenu.app.editFromMenu()
         }
 
-        // Nest this todo under another. Hidden once it has children of its own —
+        // Nest this todo under another. Hidden once it has children of its own --
         // subtasks are one level deep, so a parent can't itself become a subtask.
         FlatButton {
             width: 560

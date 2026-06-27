@@ -25,7 +25,7 @@ ModalSheet {
         color: "black"
     }
 
-    // Preview of the todo being deleted — the text, or the snippet image.
+    // Preview of the todo being deleted -- the text, or the snippet image.
     Rectangle {
         id: preview
         anchors {

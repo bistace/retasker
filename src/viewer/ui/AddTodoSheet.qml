@@ -15,7 +15,7 @@ ModalSheet {
     cardWidth: 840
     // Top-anchored so the card and its buttons stay above the on-screen
     // keyboard. While typing (field focused) the month picker is hidden and the
-    // card collapses to the compact height — only the calendar view ever needs
+    // card collapses to the compact height -- only the calendar view ever needs
     // the taller card, and only when the keyboard is down.
     topMargin: 80
     cardHeight: (app.viewMode === "calendar" || addField.activeFocus) ? 720 : 1180

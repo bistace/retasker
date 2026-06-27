@@ -1,4 +1,4 @@
-// reTasker capture extension — framebuffer capture.
+// reTasker capture extension -- framebuffer capture.
 //
 // Registers a "retasker.capture" signal handler on xovi-message-broker. When
 // fired with a bbox JSON payload, it reads the live framebuffer address from
@@ -9,7 +9,7 @@
 //   echo 'eretasker.capture:{"x":100,"y":200,"width":400,"height":300}' > /run/xovi-mb
 //
 // The same .so also exports the xochitl native-bridge handlers (newnote/template
-// lookups); those live in bridge.c — an unrelated responsibility, kept in the
+// lookups); those live in bridge.c -- an unrelated responsibility, kept in the
 // same extension only because they share the broker entry point and build.
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +27,7 @@
 #include "rotate.h"
 
 // The viewer (AppLoad app) treats this folder as the todo list, so capture
-// writes here and delete removes from here — one shared source of truth.
+// writes here and delete removes from here -- one shared source of truth.
 #define CAPTURE_DIR "/home/root/xovi/exthome/appload/retasker/captures"
 #define FB_TYPE_RGBA 2 // FBSPY_TYPE_RGBA from framebuffer-spy.h (32-bit pixels)
 
@@ -52,7 +52,7 @@ static int parse_fb_config(const char *s, struct fb_config *c) {
 // JSON payload contract for the scrapers below (json_int, parse_bbox, json_str,
 // json_bool): all incoming payloads are FLAT, single-level objects produced by
 // first-party code (the selection .qmd and the QML viewer). Values are only
-// strings, integers or booleans — no nesting, no arrays, no duplicated keys.
+// strings, integers or booleans -- no nesting, no arrays, no duplicated keys.
 // Each scraper finds its key by substring search and reads the value right after,
 // so these assumptions must hold; if a payload ever needs nesting or arrays,
 // replace these with a real single-header JSON parser rather than extending them.

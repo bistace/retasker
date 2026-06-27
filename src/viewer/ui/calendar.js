@@ -1,7 +1,7 @@
 .pragma library
 
 // Calendar helpers for the month view. Pure functions: no Qt, no file IO.
-// Days are keyed "year-month-day" (1-based month/day, no zero padding) — the
+// Days are keyed "year-month-day" (1-based month/day, no zero padding) -- the
 // key is only ever used as a map lookup, so its exact form doesn't matter as
 // long as dateKey() and monthGrid() agree.
 

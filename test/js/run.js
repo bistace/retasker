@@ -39,7 +39,7 @@ check("dateKey formats y-m-d with no zero padding", () => {
 });
 
 // addMonths/buildIndex/monthCounts return objects from the vm realm, whose
-// prototype differs from this realm's — so compare fields, not deepStrictEqual.
+// prototype differs from this realm's -- so compare fields, not deepStrictEqual.
 function eqMonth(r, year, month) {
     assert.strictEqual(r.year, year);
     assert.strictEqual(r.month, month);

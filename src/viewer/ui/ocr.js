@@ -5,7 +5,7 @@
 // (write the .txt and drop the .png, or keep the .png as-is).
 //
 // onResult is called with the transcribed text on success, or null when the
-// note is unreadable or the request fails (offline) — in both cases the caller
+// note is unreadable or the request fails (offline) -- in both cases the caller
 // keeps the original image.
 
 var UNREADABLE = "UNREADABLE";

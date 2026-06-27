@@ -1,7 +1,7 @@
 import QtQuick
 
 // One todo row: a toggle circle, the captured snippet, and its date.
-// Pure black/white, no animation — meant for e-ink.
+// Pure black/white, no animation -- meant for e-ink.
 //
 // Height adapts to the content: image snippets get a fixed tall box, while
 // transcribed text shrinks to fit its line(s) so a one-line todo isn't a
