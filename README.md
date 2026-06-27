@@ -1,173 +1,137 @@
 # reTasker
 
-A todo system for the reMarkable Paper Pro, built on XOVI and AppLoad. Circle handwriting in any notebook to capture a todo; a standalone app shows them in a list and a calendar, auto-transcribes the ink to text, and can spin up a dated notebook for the day.
+reTasker is a todo system for the reMarkable Paper Pro that turns handwriting into a tracked task list. You circle a few words in any notebook, tap a button, and the selection becomes a todo. A companion application transcribes the ink to text, shows everything as a list or a calendar, and can open a fresh dated notebook for the day.
 
-This README is the reminder I'll want after a factory reset, when the tablet is back to stock and none of the plumbing exists. It goes in order: get back into the device, put XOVI back, build the four reTasker artifacts, copy them to the right places, reload. Skip ahead if XOVI is already alive — you only need the build and deploy sections.
+It is built on [XOVI](https://github.com/asivery/rm-xovi-extensions) and AppLoad, and installs as a package through [vellum](https://vellum.delivery).
 
-## What gets installed where
+## Features
 
-reTasker is not one file. It's a native XOVI extension, an AppLoad backend process, a compiled QML bundle, and four qmldiff patches that splice buttons into xochitl's own UI. Everything lives under `/home/root/xovi` on the device.
+- **Capture from handwriting.** Select handwriting in any notebook and tap **Add to todos** in the selection menu. The snippet is saved and added to your list.
+- **Automatic transcription.** New captures are transcribed to text the next time you open the viewer, using a vision model of your choice through OpenRouter. The original ink is kept until the transcription succeeds.
+- **List and calendar views.** A standalone application shows your todos as a flat list or a monthly calendar. Each day carries a small progress arc for completed versus total, and days holding todos or notes are marked.
+- **Subtasks.** Todos can be nested under a parent and collapsed, which keeps long lists readable.
+- **Tap to complete, filter to focus.** Tap a row to mark it done, and switch the view between open, done, and all.
+- **Manual entry and editing.** Add todos directly from the list or the calendar, one per line, and long-press any todo to modify or delete it.
+- **Dated notebooks.** The **+ New note** button creates and opens a date-named notebook inside a "reTasker" collection, ready for the day's writing.
 
-| Artifact | Built from | Lands on device at |
-| --- | --- | --- |
-| `retasker-capture.so` | `src/capture/` | `xovi/extensions.d/retasker-capture.so` (chmod +x) |
-| `retasker-backend` | `src/backend/` | `xovi/exthome/appload/retasker/backend/entry` (chmod +x) |
-| `retasker-viewer.rcc` | `src/viewer/` | `xovi/exthome/appload/retasker/resources.rcc` |
-| `manifest.json` | `src/viewer/manifest.json` | `xovi/exthome/appload/retasker/manifest.json` |
-| `icon.png` | `src/viewer/assets/icon.png` | `xovi/exthome/appload/retasker/icon.png` |
-| `config.json` | `src/viewer/config.example.json` | `xovi/exthome/appload/retasker/config.json` |
-| `retasker-selection.qmd` | `src/selection/` | `xovi/exthome/qt-resource-rebuilder/` |
-| `retasker-toolbar.qmd` | `src/selection/` | `xovi/exthome/qt-resource-rebuilder/` |
-| `retasker-newnote.qmd` | `src/newnote/` | `xovi/exthome/qt-resource-rebuilder/` |
-| `retasker-window.qmd` | `src/appload/` | `xovi/exthome/qt-resource-rebuilder/` |
+## Requirements
 
-The native `.so` writes and deletes PNGs and runs the new-note filesystem lookups. The backend owns the SQLite DB (`retasker.db`, created on first run, next to the manifest). The `.rcc` is the viewer UI. The qmds add the "Add to todos" button to the selection menu, the launcher button to the writing toolbar, and the new-note bridge inside xochitl.
+reTasker targets the **reMarkable Paper Pro** (codename ferrari) running OS **3.27.x**. It will not install on other firmware, as the interface patches are tied to a specific version.
 
-The device is a **reMarkable Paper Pro** ("ferrari"), OS **3.27.1.0**. The hashtab and the conditional `framebuffer-spy` import are both tied to that OS version — if you've upgraded the OS, see the gotchas at the bottom before trusting an old hashtab.
+You will need a device with:
 
-## 1. Get back into the tablet
+- Developer mode enabled and SSH access. The [reMarkable Guide](https://remarkable.guide) covers this for the Paper Pro.
+- [XOVI](https://github.com/asivery/rm-xovi-extensions) installed, with its qmldiff hashtable built for your OS.
+- [vellum](https://vellum.delivery), the reMarkable package manager.
 
-A factory reset wipes the authorized SSH key, the WiFi-SSH marker, and Developer Mode. SSH doesn't exist on the Paper Pro until Developer Mode is back on, so start there: **Settings → General → Paper Tablet → Software → Advanced → Developer Mode**. Turning it on factory-resets the tablet a *second* time, so let anything you care about sync to the cloud first, then wait out the reset.
+The XOVI extensions reTasker relies on — appload, qt-resource-rebuilder, xovi-message-broker and framebuffer-spy — are pulled in automatically by vellum, so you do not need to install them by hand.
 
-With Developer Mode on, plug in over USB — the tablet comes up as a USB-ethernet device at `10.11.99.1` and generates a root password. Read it off the tablet under **Settings → General → Help → About → Copyrights and licenses**, beneath the **GPLv3 Compliance** header (it lists the password and the IPs you can reach). Then authorize the dedicated key — the default `~/.ssh/id_ed25519` is deliberately not trusted:
+## Installation
+
+All commands below run on the tablet over SSH.
+
+First, tell vellum to trust the reTasker signing key and add the package repository:
 
 ```sh
-ssh-copy-id -i ~/.ssh/retasker_tablet_ed25519.pub root@10.11.99.1
+wget -O /home/root/.vellum/etc/apk/keys/retasker.rsa.pub \
+  https://bistace.github.io/retasker/retasker.rsa.pub
+echo "https://bistace.github.io/retasker" >> /home/root/.vellum/etc/apk/repositories
 ```
 
-Confirm it works:
+Then refresh the index and install:
 
 ```sh
-ssh -i ~/.ssh/retasker_tablet_ed25519 -o IdentitiesOnly=yes root@10.11.99.1 'echo ok'
+vellum update
+vellum add retasker
 ```
 
-The Paper Pro disables SSH over WiFi by default, and the USB-ethernet link sleeps when idle, so turn on WiFi access — it survives reboots and OS updates:
+This pulls reTasker together with its XOVI dependencies. The interface patches need the qmldiff hashtable to be built for your firmware. If you have not done this already for your current OS, run:
 
 ```sh
-ssh -i ~/.ssh/retasker_tablet_ed25519 -o IdentitiesOnly=yes root@10.11.99.1 'rm-ssh-over-wlan on'
+xovi/rebuild_hashtable   # interactive — enter the device password shown on the tablet
 ```
 
-From here on, `~/bin/rmpp '<cmd>'` resolves the tablet's DHCP address by its wlan0 MAC and SSHes in over WiFi. DHCP can hand it a new IP, so always let `rmpp` find it rather than hardcoding one. `rmpp` prints `rmpp: found at <ip>` to stderr — grab that IP for `scp`.
-
-## 2. Put XOVI back
-
-reTasker needs XOVI plus four modules: `appload`, `framebuffer-spy`, `qt-resource-rebuilder`, `xovi-message-broker`. **Install the XOVI core the manual way, not through vellum** — `vellum add xovi` skips the `start`, `stock`, `debug`, and `rebuild_hashtable` scripts you need to load, reload, and maintain it. The four modules then come cleanly from **vellum**, the reMarkable package manager. Everything here runs on the tablet over SSH (`rmpp '<cmd>'`), and the tablet needs internet — the installer pulls XOVI from GitHub.
-
-Grab `extensions-aarch64.zip` from the [rm-xovi-extensions releases](https://github.com/asivery/rm-xovi-extensions/releases), unzip it, and copy the installer to the tablet (use the IP `rmpp` prints):
+Finally, reload XOVI to activate everything:
 
 ```sh
-IP=$(rmpp true 2>&1 >/dev/null | sed -n 's/.*found at //p')
-scp -i ~/.ssh/retasker_tablet_ed25519 -o IdentitiesOnly=yes \
-    install-xovi-for-rm root@$IP:/home/root/
+xovi/start
 ```
 
-Run it on the device — it downloads `xovi.so` and lays down `/home/root/xovi/` with the `start`, `stock`, `debug`, and `rebuild_hashtable` scripts:
+If everything went fine, you will find an **Add to todos** entry in the selection menu when you circle handwriting, a reTasker button on the writing toolbar, and a reTasker launcher on the home screen.
+
+## Transcription
+
+Transcription turns your captured handwriting into text. It is optional: without it, each capture stays in the list as the ink image you selected.
+
+reTasker sends snippets to [OpenRouter](https://openrouter.ai), which lets you pick any supported vision model. Edit the configuration file and set your API key:
 
 ```sh
-rmpp 'chmod +x /home/root/install-xovi-for-rm && /home/root/install-xovi-for-rm'
+vi /home/root/xovi/exthome/appload/retasker/config.json
 ```
 
-Now install vellum for the modules. Pull the current bootstrap one-liner and its checksum from the [vellum-cli releases page](https://github.com/vellum-dev/vellum-cli/releases/latest); it downloads, verifies, and runs `bootstrap.sh`, landing vellum at `/home/root/.vellum/bin/vellum`:
-
-```sh
-rmpp 'wget --no-check-certificate -O bootstrap.sh \
-  https://github.com/vellum-dev/vellum-cli/releases/latest/download/bootstrap.sh && bash bootstrap.sh'
+```json
+{
+    "endpoint": "https://openrouter.ai/api/v1/chat/completions",
+    "apiKey": "sk-or-...",
+    "model": "google/gemini-3.5-flash",
+    "prompt": "You are an OCR system. The image is a short handwritten note. Transcribe it exactly as written..."
+}
 ```
 
-`bootstrap.sh` adds vellum to `.bashrc`, but that won't carry across separate `rmpp` calls, so invoke it by full path. Refresh the index and pull the four modules:
+The `model` field accepts any OpenRouter model identifier, and `prompt` lets you adapt the instructions, for instance to set the expected language. Your key stays on the device and is never part of the package, so updates and reinstalls leave the file untouched.
+
+## Usage
+
+Write in a notebook as you normally would. To capture a task, select the relevant handwriting with the selection tool and tap **Add to todos**. The snippet is saved and shows up in the viewer.
+
+Open the viewer from the reTasker button on the writing toolbar, or from the launcher on the home screen. Tap a row to toggle it done, and use the filter to move between open, done, and all todos. Switch to the calendar to see your tasks day by day, each day showing how many are completed. To plan a day on paper, tap **+ New note**: reTasker creates a notebook named for the date inside a "reTasker" collection and opens it.
+
+## Updating
 
 ```sh
-rmpp '/home/root/.vellum/bin/vellum update'
-rmpp '/home/root/.vellum/bin/vellum add appload framebuffer-spy qt-resource-rebuilder xovi-message-broker'
+vellum update && vellum add retasker
 ```
 
-Last known-good set: xovi 0.3.3-r2, appload 0.5.3, the extensions at 19.0.0.
+Your todos, the database and the configuration are preserved across updates.
 
-Now build the qmldiff hashtab:
+## Uninstalling
 
 ```sh
-rmpp '/home/root/xovi/rebuild_hashtable'   # interactive — enter the device password on the tablet screen
+vellum del retasker
 ```
 
-`rebuild_hashtable` prompts and reads a password typed on the tablet itself; it stops on its own at "Hashtab saved". The hashtab must match the running OS — a 3.24 hashtab on 3.27 loads zero entries and silently crash-loops AppLoad. If you landed here by *upgrading* the OS rather than a clean install, run `vellum reenable` first to restore the system-partition mods (it nags until you do). The qmldiff patches qt-resource-rebuilder reads live in `xovi/exthome/qt-resource-rebuilder/`, which is where reTasker's four `.qmd` files go in the next step.
+This also removes the shared XOVI modules when nothing else depends on them. To keep them, mark them as explicitly installed first with `vellum add appload qt-resource-rebuilder xovi-message-broker framebuffer-spy`. To remove reTasker together with its database and settings, use `vellum purge retasker` instead.
 
-XOVI is tethered: a full reboot drops back to stock until you run `xovi/start`. Keep that command handy — you'll use it as the reload at the end.
+## How it works
 
-## 3. Build the four artifacts
+reTasker is made of four parts that communicate through the xovi-message-broker:
 
-There's no native aarch64 toolchain on the Mac, so everything builds inside a Docker container holding the official ferrari Yocto SDK. Bring up colima and bake the image once:
+- a native XOVI extension that writes the handwriting snippets and runs the new-note lookups,
+- a backend process that owns the SQLite database of todos,
+- a compiled QML application, the viewer, launched through AppLoad,
+- and a set of qmldiff patches that splice the buttons into xochitl's own interface.
+
+The viewer ships no SQLite of its own, so it asks the backend for a page of todos and renders it, while the backend handles sorting and calendar bucketing. The captured PNG snippets are the only files left on disk, and each one is removed once its transcription has been stored.
+
+## Building from source
+
+Contributors can build the artifacts themselves. The cross-compilation runs inside a Docker image holding the official ferrari Yocto SDK.
 
 ```sh
-colima start --cpu 4 --memory 8 --disk 60
+colima start --cpu 4 --memory 8 --disk 60          # or any Docker provider
 docker build --platform linux/amd64 -t retasker-toolchain:latest toolchain/
+
+./build.sh           # native XOVI capture extension -> build/retasker-capture.so
+./build-backend.sh   # AppLoad backend, SQLite linked -> build/retasker-backend
+./build-viewer.sh    # compiled viewer QML            -> build/retasker-viewer.rcc
 ```
 
-The image is amd64 (the SDK installer is an x86_64 self-extracting script) and runs under qemu — slow to build the first time, fine afterward. Then run the three build scripts; each one drops its output in `build/`:
+`bundle-release.sh` assembles these into the release tarball that the package consumes, and `packages/retasker/VELBUILD` describes the package. Tagging a GitHub release builds and publishes a signed package automatically.
 
-```sh
-./build.sh           # build/retasker-capture.so   (native XOVI extension)
-./build-backend.sh   # build/retasker-backend      (AppLoad backend, SQLite linked in)
-./build-viewer.sh    # build/retasker-viewer.rcc   (compiled QML)
-```
+## License
 
-The launcher icon is already committed at `src/viewer/assets/icon.png`. Regenerate it only if you've changed the design:
+reTasker is released under the GNU General Public License v3.0. See [LICENSE](LICENSE).
 
-```sh
-python3 src/viewer/assets/gen_icon.py src/viewer/assets/icon.png
-```
+## Issues
 
-The OCR config carries your OpenRouter key and is git-ignored. Copy the template and fill it in before deploying:
-
-```sh
-cp src/viewer/config.example.json src/viewer/config.json
-$EDITOR src/viewer/config.json    # set apiKey to your sk-or-... key
-```
-
-## 4. Deploy
-
-Grab the device IP once, set up the app directory tree, then copy everything from the table. Adjust the `IP` capture if your `rmpp` output differs.
-
-```sh
-IP=$(rmpp true 2>&1 >/dev/null | sed -n 's/.*found at //p')
-SCP="scp -i ~/.ssh/retasker_tablet_ed25519 -o IdentitiesOnly=yes"
-APP=/home/root/xovi/exthome/appload/retasker
-QRR=/home/root/xovi/exthome/qt-resource-rebuilder
-
-rmpp "mkdir -p $APP/backend $APP/captures"
-
-# native extension + qmldiff patches
-$SCP build/retasker-capture.so        root@$IP:/home/root/xovi/extensions.d/
-$SCP src/selection/retasker-selection.qmd src/selection/retasker-toolbar.qmd \
-     src/newnote/retasker-newnote.qmd  src/appload/retasker-window.qmd \
-     root@$IP:$QRR/
-
-# the AppLoad app
-$SCP build/retasker-backend           root@$IP:$APP/backend/entry
-$SCP build/retasker-viewer.rcc        root@$IP:$APP/resources.rcc
-$SCP src/viewer/manifest.json         root@$IP:$APP/manifest.json
-$SCP src/viewer/assets/icon.png       root@$IP:$APP/icon.png
-$SCP src/viewer/config.json           root@$IP:$APP/config.json
-
-rmpp "chmod +x /home/root/xovi/extensions.d/retasker-capture.so $APP/backend/entry"
-```
-
-Reload XOVI to pick it all up:
-
-```sh
-rmpp '/home/root/xovi/start'
-```
-
-`xovi/start` restarts xochitl and may briefly drop the SSH session — that's expected. The `.rcc` re-registers on every app launch, so to see viewer changes later you only need to close and relaunch the app, no `xovi/start` required.
-
-## 5. Check it
-
-Open a notebook, circle some handwriting, and look for **Add to todos** in the selection menu. The writing toolbar gets a reTasker button that opens the viewer over the note; the `</>` AppLoad launcher on the home screen opens it too. Tap a row to toggle done, switch to the calendar, and "+ New note" should create and open a dated notebook in a "reTasker" collection.
-
-If the app doesn't appear, the usual culprit is the hashtab not matching the OS (rebuild it) or a stray backup file in a load directory (see below).
-
-## Gotchas worth re-reading
-
-- **Never leave `.bak` copies inside `extensions.d/` or `qt-resource-rebuilder/`.** Both directories are loaded by scanning, so a leftover `retasker-capture.so.bak` is loaded a second time and xochitl crash-loops with "Extension processed more than once". Keep backups somewhere else, like `/home/root/retasker-landscape-backup/`.
-- **The hashtab is per-OS.** Upgrade the OS and the old hashtab loads nothing, which takes AppLoad down quietly. Rerun `xovi/rebuild_hashtable`.
-- **`framebuffer-spy` loads conditionally.** The capture extension uses a soft `import?` so it unloads cleanly in xochitl's launcher/setup processes (where Qt isn't mapped) and resolves only in the GUI process. Don't change that import to a hard one — a hard import halts the process that lacks the symbol.
-- **Reboot equals stock.** Any full restart leaves XOVI inert until `xovi/start`. The viewer's transcription needs `config.json` present and a valid OpenRouter key, or captures stay as images instead of becoming text.
+In case of troubles when installing or using reTasker, please open an issue on the [project page](https://github.com/bistace/retasker/issues).
