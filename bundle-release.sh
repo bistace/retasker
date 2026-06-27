@@ -27,6 +27,7 @@ cp "$REPO/src/selection/retasker-selection.qmd" "$STAGE/"
 cp "$REPO/src/selection/retasker-toolbar.qmd" "$STAGE/"
 cp "$REPO/src/newnote/retasker-newnote.qmd" "$STAGE/"
 cp "$REPO/src/appload/retasker-window.qmd" "$STAGE/"
+cp "$REPO/src/launchbar/retasker-launchbar.qmd" "$STAGE/"
 
 tar czf "$TARBALL" -C "$STAGE" .
 rm -rf "$STAGE"
