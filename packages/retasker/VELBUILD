@@ -37,8 +37,9 @@ package() {
 
 # Seed config.json only if absent. It is never package-owned, so upgrades never overwrite
 # the user's OpenRouter key or model.
+# Body runs standalone as $pkgname.post-install (not a function), so no `local`.
 postinstall() {
-    local app=/home/root/xovi/exthome/appload/retasker
+    app=/home/root/xovi/exthome/appload/retasker
     [ -f "$app/config.json" ] || cp "$app/config.example.json" "$app/config.json"
     cat <<'EOF'
 reTasker installed. Add your OpenRouter key + model:
