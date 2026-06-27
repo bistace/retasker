@@ -16,11 +16,11 @@ jobs:
   bundle:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: main # check out main so the checksum commit lands there
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -58,3 +58,45 @@ jobs:
             git commit -m "chore: sync VELBUILD to ${GITHUB_REF_NAME}"
             git push origin main
           fi
+
+      # Build the signed .apk: vbuild fetches the just-uploaded tarball, verifies it
+      # against the synced sha512, runs package(), and signs with the repo's key.
+      - name: Install vbuild
+        run: |
+          curl -fsSL -o /usr/local/bin/vbuild \
+            "https://github.com/Eeems/vbuild/releases/download/${VBUILD_VERSION}/vbuild-x86_64-glibc"
+          chmod +x /usr/local/bin/vbuild
+        env:
+          VBUILD_VERSION: 0.0.30
+
+      - name: Build signed apk
+        run: |
+          printf '%s\n' "${{ secrets.SIGNING_KEY }}" > keys/retasker.rsa
+          chmod 600 keys/retasker.rsa
+          ./build-apk.sh
+
+      # Publish to the gh-pages apk repo. Prior versions are pulled back in so the
+      # regenerated APKINDEX keeps them installable; the index is signed in-container.
+      - name: Publish apk repo to GitHub Pages
+        env:
+          REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          ARCH=aarch64
+          git clone --branch gh-pages --depth 1 "$REPO_URL" site \
+            || { mkdir site && git -C site init -q && git -C site checkout -q -b gh-pages; }
+          mkdir -p "site/$ARCH"
+          cp dist/$ARCH/retasker-*.apk "site/$ARCH/"
+          cp keys/retasker.rsa.pub "site/retasker.rsa.pub"
+          docker run --rm \
+            -v "$PWD/site/$ARCH:/packages" -v "$PWD/keys:/keys:ro" -w /packages \
+            ghcr.io/eeems/vbuild-builder:main \
+            sh -c "cp /keys/retasker.rsa.pub /etc/apk/keys/ \
+              && apk index --rewrite-arch $ARCH -o APKINDEX.tar.gz *.apk \
+              && abuild-sign -k /keys/retasker.rsa APKINDEX.tar.gz \
+              && chown -R $(id -u):$(id -g) ."
+          cd site
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "publish retasker ${GITHUB_REF_NAME}" || { echo "nothing to publish"; exit 0; }
+          git push "$REPO_URL" HEAD:gh-pages
