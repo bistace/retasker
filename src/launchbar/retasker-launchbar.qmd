@@ -1,0 +1,47 @@
+; reTasker: add an "open viewer" button to the home-screen launch bar.
+;
+; Targets HomeScreen.CreateMenu (the pill-shaped bar at the bottom of the
+; home screen containing the search lens and the "+" create button). The bar
+; is Item#root > Rectangle#primaryContainer > RowLayout#primaryLayout; we
+; append one more button to that row. Tapping it asks AppLoad to launch the
+; reTasker viewer fullscreen. Because the viewer is a fullscreen overlay,
+; closing it drops the user straight back to the home screen.
+;
+; We inline a self-contained MouseArea rather than reuse CreateMenu's local
+; `component Action: MouseArea`: qmldiff does not resolve a file-local inline
+; component for nodes it INSERTs, so `Action {}` binds to an imported Action
+; type (onTriggered, no onClicked) and CreateMenu fails to compile which,
+; being the home screen, boot-loops xochitl. MouseArea is a core QtQuick type
+; (always resolvable, has onClicked); the layout mirrors the local component.
+;
+; Unhashed on purpose: Xochitl ships its QML as plaintext, so real identifiers
+; match directly and we avoid a hashtab dependency. LOCATE AFTER ALL appends to
+; the row (positional; qmldiff's Type#id matcher can't target the inline
+; component instances by type either).
+
+AFFECT /qt/qml/xofm/libs/homescreen/qml/CreateMenu.qml
+    IMPORT net.asivery.AppLoad 1.0
+
+    TRAVERSE Item#root > Rectangle#primaryContainer > RowLayout#primaryLayout
+        LOCATE AFTER ALL
+        INSERT {
+            MouseArea {
+                id: retaskerOpenViewer
+                objectName: "retasker-open-viewer-button"
+                Layout.alignment: Qt.AlignHCenter
+                Layout.minimumWidth: height
+                Layout.fillHeight: true
+                onClicked: AppLoadLauncher.launchApplication("retasker", [], ({}), false)
+                ColumnLayout {
+                    anchors.centerIn: parent
+                    spacing: 0
+                    ArkControls.Icon {
+                        Layout.alignment: Qt.AlignHCenter
+                        size: ArkControls.Values.iconSize.medium
+                        source: "qrc:/ark/icons/checkmark_circle"
+                    }
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT
