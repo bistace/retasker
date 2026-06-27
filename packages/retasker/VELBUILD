@@ -12,7 +12,7 @@ license="GPL-3.0"
 # hashtab-bound to the OS, so pin the reMarkable OS range the hashtab was built for.
 depends="appload qt-resource-rebuilder xovi-message-broker framebuffer-spy remarkable-os>=3.27 remarkable-os<3.28"
 source="https://github.com/bistace/retasker/releases/download/v$pkgver/retasker-$pkgver-aarch64.tar.gz"
-sha512sums="9024e04fa885d1c246bfa15265a9d8b97781460a52f7e38331da1725099e49a5bc2b47fd215a9d006296ee70cf9f1d72bcae5ba13a5f01463538ca3218d69a1c  retasker-$pkgver-aarch64.tar.gz"
+sha512sums="81a92f4bf5a5651e157f11fe70149d18d6eeee1eb69ece91aee8a9a83a4b53a9b38b9bbc4c90995f7476c020bc857c9c6b20ef3bf28c3f6992c516411834a302  retasker-$pkgver-aarch64.tar.gz"
 options="!check !fhs"
 
 package() {
