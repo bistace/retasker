@@ -1,0 +1,9 @@
+{
+  "name": "retasker-tools",
+  "private": true,
+  "type": "module",
+  "description": "Dev tooling for reTasker (not part of the shipped app).",
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  }
+}
