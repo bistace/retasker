@@ -2,6 +2,8 @@
 
 reTasker is a todo system for the reMarkable Paper Pro that turns handwriting into a tracked task list. You circle a few words in any notebook, tap a button, and the selection becomes a todo. A companion application transcribes the ink to text, shows everything as a list or a calendar, and can open a fresh dated notebook for the day.
 
+<video src="https://github.com/bistace/retasker/raw/main/docs/demo-web.mp4" controls muted></video>
+
 It is built on [XOVI](https://github.com/asivery/rm-xovi-extensions) and AppLoad, and installs as a package through [vellum](https://vellum.delivery).
 
 ## Features
