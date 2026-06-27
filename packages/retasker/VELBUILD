@@ -1,6 +1,6 @@
 maintainer="Benjamin Istace <benjamin.istace@gmail.com>"
 pkgname=retasker
-pkgver=0.1.0
+pkgver=1.0
 pkgrel=0
 category=productivity
 pkgdesc="Circle handwriting to capture todos; calendar + list viewer with OCR transcription."
@@ -11,7 +11,7 @@ license="GPL-3.0"
 # hashtab-bound to the OS, so pin the reMarkable OS range the hashtab was built for.
 depends="appload qt-resource-rebuilder xovi-message-broker framebuffer-spy remarkable-os>=3.27 remarkable-os<3.28"
 source="https://github.com/bistace/retasker/releases/download/v$pkgver/retasker-$pkgver-aarch64.tar.gz"
-sha512sums="d607a3c1fdba8f4d560ac3b01826c51f56141e330a3cdfde028c43333272d77943ae1d5c941296e9e97b3331c999aafbd495c3c82aee8f4de710f9f5d2a39e49  retasker-$pkgver-aarch64.tar.gz"
+sha512sums="d2d7eb0f1c4332f2398ac10589fe2cafc792a8fc2aaa777bda6e96131a667e95e9cf93363548a4527119885459fabdad1821e97e7ba4fa2216e1f7fecfe64535  retasker-$pkgver-aarch64.tar.gz"
 options="!check !fhs"
 
 package() {
