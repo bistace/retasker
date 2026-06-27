@@ -17,19 +17,19 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # The gha cache backend needs the docker-container driver, not the default one.
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Runner is amd64 and the image is amd64, so this is a native build (no qemu).
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: toolchain
           platforms: linux/amd64
