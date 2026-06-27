@@ -1,6 +1,6 @@
 maintainer="Benjamin Istace <benjamin.istace@gmail.com>"
 pkgname=retasker
-pkgver=1.0.1
+pkgver=1.0.2
 pkgrel=0
 upstream_author="Benjamin Istace"
 category=apps
@@ -12,7 +12,7 @@ license="GPL-3.0"
 # hashtab-bound to the OS, so pin the reMarkable OS range the hashtab was built for.
 depends="appload qt-resource-rebuilder xovi-message-broker framebuffer-spy remarkable-os>=3.27 remarkable-os<3.28"
 source="https://github.com/bistace/retasker/releases/download/v$pkgver/retasker-$pkgver-aarch64.tar.gz"
-sha512sums="ed9d50535290cfa16d7ce648d64a9c2d930bb28413b33a0af5bb89f7139beacaf162e74e471b7a747f67d0e019681b3c37afa189e3f4e573e3679e772f3b7cc6  retasker-$pkgver-aarch64.tar.gz"
+sha512sums="84d69c8174e196275c2114c05a79fe34188fcfe144ee20db7b058b303ca9594278569a148e1d927706dace3cdc25319d3160e41314f0b2e7fb3c754ec86d7a35  retasker-$pkgver-aarch64.tar.gz"
 # Prebuilt aarch64 binaries: the x86_64 builder has no cross-strip, and the runtime
 # libs (libc, Qt) come from the reMarkable system, not apk packages.
 options="!check !fhs !strip !tracedeps"
