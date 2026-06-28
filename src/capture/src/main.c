@@ -17,8 +17,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <time.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <sys/stat.h>
 
 #include "../xovi.h"
@@ -27,6 +25,7 @@
 #include "../vendor/stb_image_write.h"
 
 #include "rotate.h"
+#include "broker.h"
 
 // The viewer (AppLoad app) treats this folder as the todo list, so capture
 // writes here and delete removes from here -- one shared source of truth.
@@ -132,11 +131,7 @@ static char *write_png(const uint8_t *rgb, const struct rect *r) {
 // confirmation. Best-effort: the capture already succeeded, so a failed notify is
 // not fatal and must not change the handler's return value.
 static void notify_captured(void) {
-    int fd = open("/run/xovi-mb", O_WRONLY);
-    if (fd < 0) return;
-    const char *msg = "uretasker.captured:1\n";
-    if (write(fd, msg, strlen(msg)) < 0) fprintf(stderr, "[retasker] captured notify failed\n");
-    close(fd);
+    emit_broker_signal("captured", "uretasker.captured:1\n");
 }
 
 // export: invoked by xovi-message-broker for the "retasker.capture" signal.

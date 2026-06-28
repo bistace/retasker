@@ -8,11 +8,11 @@
 // the default template. They re-emit to the MainView QML listener over the broker
 // pipe (the 'u' route delivers to QML).
 #include <dirent.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <unistd.h>
+
+#include "broker.h"
 
 #define XOCHITL_DIR "/home/root/.local/share/remarkable/xochitl"
 #define TEMPLATE_CONFIG "/home/root/xovi/exthome/appload/retasker/template.json"
@@ -184,18 +184,12 @@ char *newNoteHandler(const char *value) {
         closedir(d);
     }
 
-    int fd = open("/run/xovi-mb", O_WRONLY);
-    if (fd < 0) {
-        fprintf(stderr, "[retasker] newnote: cannot open broker pipe\n");
-        return NULL;
-    }
     char encName[1536], encFolder[512], encExisting[512], encTemplate[1536];
     if (json_escape(name, encName, sizeof(encName)) != 0 ||
         json_escape(folderId, encFolder, sizeof(encFolder)) != 0 ||
         json_escape(existing, encExisting, sizeof(encExisting)) != 0 ||
         json_escape(templateFilename, encTemplate, sizeof(encTemplate)) != 0) {
         fprintf(stderr, "[retasker] newnote: JSON escape failed\n");
-        close(fd);
         return NULL;
     }
 
@@ -204,11 +198,7 @@ char *newNoteHandler(const char *value) {
                      "uretasker.newnote:{\"name\":\"%s\",\"folder\":\"%s\",\"existing\":\"%s\","
                      "\"template\":\"%s\"}\n",
                      encName, encFolder, encExisting, encTemplate);
-    if (n > 0 && n < (int)sizeof(out)) {
-        if (write(fd, out, (size_t)n) < 0)
-            fprintf(stderr, "[retasker] newnote: pipe write failed\n");
-    }
-    close(fd);
+    if (n > 0 && n < (int)sizeof(out)) emit_broker_signal("newnote", out);
     return NULL;
 }
 
@@ -223,19 +213,10 @@ char *chooseTemplateHandler(const char *value) {
         return NULL;
     }
 
-    int fd = open("/run/xovi-mb", O_WRONLY);
-    if (fd < 0) {
-        fprintf(stderr, "[retasker] chooseTemplate: cannot open broker pipe\n");
-        return NULL;
-    }
     char out[2048];
     int n =
         snprintf(out, sizeof(out), "uretasker.chooseTemplate:{\"template\":\"%s\"}\n", encTemplate);
-    if (n > 0 && n < (int)sizeof(out)) {
-        if (write(fd, out, (size_t)n) < 0)
-            fprintf(stderr, "[retasker] chooseTemplate: pipe write failed\n");
-    }
-    close(fd);
+    if (n > 0 && n < (int)sizeof(out)) emit_broker_signal("chooseTemplate", out);
     return NULL;
 }
 
