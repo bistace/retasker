@@ -482,13 +482,12 @@ Rectangle {
                 break;
             }
         }
-        // Re-scope the view to match: a status-filtered list drops a top-level
-        // row, and the calendar's per-day counts change. A child stays put -- an
-        // expanded parent always shows all its children -- so it never re-queries.
+        // The calendar's per-day markers change on toggle, so refresh them. The
+        // list deliberately keeps the toggled row in place (struck through)
+        // rather than re-querying it away: it stays visible until the next
+        // refresh, so an accidental tap is obvious and a second tap undoes it.
         if (root.viewMode === "calendar")
             root.requestCal();
-        else if (!isChild && root.filter !== "all")
-            root.refresh();
     }
 
     // Find a loaded list row by its filename, or null if it's no longer present.
