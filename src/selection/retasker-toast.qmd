@@ -1,0 +1,60 @@
+; reTasker: show a brief "Added to todos" confirmation after a capture.
+;
+; Capturing a todo is otherwise silent. The selection menu closes immediately and
+; the native captureHandler writes the PNG, so there is no in-context feedback. The
+; native side emits "retasker.captured" over the broker's 'u' route once the write
+; succeeds; this listener, parented to MainView (the always-instantiated top-level,
+; alive on the home screen and inside a notebook alike), flashes a static overlay.
+;
+; E-ink: pure black/white, instant visible toggle (no opacity/animation), matching
+; the rest of reTasker. The Timer hides it after a short dwell.
+;
+; Plaintext identifiers resolve via the qt-resource-rebuilder hashtab, same as
+; retasker-newnote.qmd which patches this file too.
+
+AFFECT /qml/device/view/main/MainView.qml
+    IMPORT net.asivery.XoviMessageBroker 2.0
+
+    TRAVERSE ?#root
+        LOCATE AFTER ALL
+        INSERT {
+            Rectangle {
+                id: retaskerToast
+                objectName: "retasker-toast"
+                z: 10000
+                visible: false
+                color: "black"
+                radius: 8
+                width: retaskerToastLabel.implicitWidth + 56
+                height: retaskerToastLabel.implicitHeight + 32
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.top
+                anchors.topMargin: 48
+
+                Text {
+                    id: retaskerToastLabel
+                    anchors.centerIn: parent
+                    text: "Added to todos"
+                    color: "white"
+                    font.pixelSize: 34
+                }
+
+                Timer {
+                    id: retaskerToastTimer
+                    interval: 1800
+                    onTriggered: retaskerToast.visible = false
+                }
+
+                XoviMessageBroker {
+                    id: retaskerToastBroker
+                    listeningFor: ["retasker.captured"]
+                    function onSignalReceived(sgn, message) {
+                        retaskerToast.visible = true;
+                        retaskerToastTimer.restart();
+                        return "";
+                    }
+                }
+            }
+        }
+    END TRAVERSE
+END AFFECT
