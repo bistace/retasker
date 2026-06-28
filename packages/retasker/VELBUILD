@@ -1,6 +1,6 @@
 maintainer="Benjamin Istace <benjamin.istace@gmail.com>"
 pkgname=retasker
-pkgver=1.1.0
+pkgver=1.2.0
 pkgrel=0
 upstream_author="Benjamin Istace"
 category=apps
@@ -30,7 +30,7 @@ package() {
     install -Dm644 "$srcdir/config.example.json" "$app/config.example.json"
     install -d "$app/captures"
 
-    for q in retasker-selection retasker-toolbar retasker-newnote retasker-window retasker-launchbar; do
+    for q in retasker-selection retasker-toolbar retasker-toast retasker-newnote retasker-window retasker-launchbar; do
         install -Dm644 "$srcdir/$q.qmd" "$qrr/$q.qmd"
     done
 }

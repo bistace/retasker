@@ -25,6 +25,7 @@
 #include "../vendor/stb_image_write.h"
 
 #include "rotate.h"
+#include "broker.h"
 
 // The viewer (AppLoad app) treats this folder as the todo list, so capture
 // writes here and delete removes from here -- one shared source of truth.
@@ -125,6 +126,14 @@ static char *write_png(const uint8_t *rgb, const struct rect *r) {
     return strdup(path);
 }
 
+// Tell the xochitl-side QML toast a capture landed. The 'u' broker route delivers
+// to QML listeners (same mechanism bridge.c uses); MainView shows a brief
+// confirmation. Best-effort: the capture already succeeded, so a failed notify is
+// not fatal and must not change the handler's return value.
+static void notify_captured(void) {
+    emit_broker_signal("captured", "uretasker.captured:1\n");
+}
+
 // export: invoked by xovi-message-broker for the "retasker.capture" signal.
 char *captureHandler(const char *value) {
     fprintf(stderr, "[retasker] capture signal: %s\n", value ? value : "(null)");
@@ -168,5 +177,6 @@ char *captureHandler(const char *value) {
 
     char *path = write_png(rgb, &r);
     free(rgb);
+    if (path != NULL) notify_captured();
     return path;
 }
